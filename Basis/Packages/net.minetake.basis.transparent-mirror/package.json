@@ -1,0 +1,18 @@
+{
+  "name": "net.minetake.basis.transparent-mirror",
+  "displayName": "Transparent Mirror",
+  "version": "0.0.1",
+  "description": "VRChat-style world mirror prop with Off / Full / Transparent modes cycled by a single local interactable button.",
+  "author": {
+    "name": "minetake",
+    "url": "https://github.com/minetake"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.4.0"
+  },
+  "vpmDependencies": {
+    "com.basis.framework": "0.0.1",
+    "com.basis.sdk": "0.0.1"
+  }
+}

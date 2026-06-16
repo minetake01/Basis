@@ -1,0 +1,23 @@
+{
+    "name": "TransparentMirror.Integration",
+    "rootNamespace": "Basis.TransparentMirror",
+    "references": [
+        "Basis Framework",
+        "BasisSDK",
+        "BasisCommon",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.Mathematics",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
