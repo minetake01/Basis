@@ -1,0 +1,7 @@
+# net.minetake.basis.mediastream
+
+Native~/build*/
+Native~/CMakeCache.txt
+Native~/CMakeUserPresets.json
+Native~/unity/IUnity*.h
+Native~/third_party/Spout2/

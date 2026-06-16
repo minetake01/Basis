@@ -1,0 +1,17 @@
+{
+  "name": "net.minetake.basis.mediastream",
+  "displayName": "Minetake Basis Media Stream (Experimental)",
+  "version": "0.0.1",
+  "description": "Experimental package: publish Unity camera render textures to external video applications (Spout2 on Windows). Includes a minimal debug streaming camera prop.",
+  "author": {
+    "name": "minetake",
+    "url": "https://github.com/minetake"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.4.0"
+  },
+  "vpmDependencies": {
+    "com.basis.framework": "0.0.1"
+  }
+}
