@@ -699,6 +699,14 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "net.minetake.basis.mediastream": {
+      "version": "file:net.minetake.basis.mediastream",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.render-pipelines.universal": "17.4.0"
+      }
+    },
     "nuget.meamod.dns": {
       "version": "file:nuget.meamod.dns",
       "depth": 0,
