@@ -43,11 +43,11 @@ if [[ "$1" == "full" ]]; then
               Packages/com.basis.profilerintergration:
               Packages/com.basis.provider.servers:
               Packages/com.basis.settings:
-              Packages/com.basis.shim:
+              Packages/net.minetake.basis.luau:
+              Packages/net.minetake.luau:
               Packages/com.basis.textmeshpro:
               Packages/com.basis.vehicles:
               Packages/com.basis.visualtrackers:
-              Packages/com.cnlohr.cilbox:
               Packages/com.cqf.urpvolumetricfog:
               Packages/com.github.homuler.mediapipe:
               Packages/com.llealloo.audiolink:

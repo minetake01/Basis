@@ -1,0 +1,26 @@
+{
+    "name": "Minetake.Basis.Luau",
+    "rootNamespace": "Minetake.Basis.Luau",
+    "references": [
+        "Luau.Unity",
+        "Luau.Native",
+        "Unity.Mathematics",
+        "LiteNetLib",
+        "BasisNetworkCore",
+        "BasisDebug",
+        "BasisSDK",
+        "Basis Framework",
+        "HVR.Basis.Comms"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [
+        "Luau.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

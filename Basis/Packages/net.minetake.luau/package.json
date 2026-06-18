@@ -1,0 +1,9 @@
+{
+    "name": "net.minetake.luau",
+    "version": "0.1.6-basis.1",
+    "displayName": "Minetake Luau",
+    "description": "Luau for .NET / Unity (vendored from nuskey8/luau-dotnet) with Basis native execution limits",
+    "author": {
+        "name": "Minetake / BasisVR"
+    }
+}

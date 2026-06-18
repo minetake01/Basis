@@ -1,0 +1,24 @@
+{
+    "name": "Minetake.Basis.Luau.Editor",
+    "rootNamespace": "Minetake.Basis.Luau.Editor",
+    "references": [
+        "Minetake.Basis.Luau",
+        "Luau.Unity",
+        "BasisSDK",
+        "BasisSDKEditor",
+        "Basis Framework"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [
+        "Luau.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -14,7 +14,8 @@ com.basis.eventdriver
 com.basis.profilerintergration
 com.basis.gizmos
 com.basis.settings
-com.basis.shim
+net.minetake.luau
+net.minetake.basis.luau
 com.basis.textmeshpro
 com.basis.visualtrackers
 com.basis.examples
@@ -41,7 +42,6 @@ com.avionblock.opussharp
 com.cqf.urpvolumetricfog
 com.llealloo.audiolink
 com.xiph.rnnoise
-com.cnlohr.cilbox
 dev.hai-vr.basis.comms
 
 # MediaPipe face/hand tracking (homuler, MIT) - used by com.basis.mediapipe.

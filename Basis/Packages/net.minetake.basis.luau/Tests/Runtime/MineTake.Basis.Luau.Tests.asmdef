@@ -1,0 +1,22 @@
+{
+    "name": "Minetake.Basis.Luau.Tests",
+    "rootNamespace": "Minetake.Basis.Luau.Tests",
+    "references": [
+        "Minetake.Basis.Luau",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "Luau.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

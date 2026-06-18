@@ -173,11 +173,11 @@ MonoBehaviour:
   - UnityEngine.AudioChorusFilter
   - UnityEngine.AudioEchoFilter
   - UnityEngine.AudioDistortionFilter
-  - Cilbox.CilboxAvatarBasis
+  - Minetake.Basis.Luau.LuauAvatarHost
+  - Minetake.Basis.Luau.LuauScriptProxy
+  - Minetake.Basis.Luau.Services.BasisLuauOscHost
   - Basis.Shims.BasisAvatarShim
   - Basis.BasisNetworkShim
-  - Cilbox.CilboxProxy
-  - Basis.Shims.BasisOsc
   - Basis.Scripts.BasisSdk.BasisHeadChop
   - HVR.Vixxy.HVRVixxyControl
   - HVR.Vixxy.HVRVixxyMenuItem

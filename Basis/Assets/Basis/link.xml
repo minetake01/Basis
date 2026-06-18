@@ -6,7 +6,6 @@
     <assembly fullname="Basis.Addon.SnapControls" preserve="all" />
     <assembly fullname="Basis.Integration.AudioLink" preserve="all" />
     <assembly fullname="Basis.OpenLipSync.Runtime" preserve="all" />
-    <assembly fullname="Basis.Shims.Samples" preserve="all" />
     <assembly fullname="BasisBundleManagement" preserve="all" />
     <assembly fullname="BasisCommon" preserve="all" />
     <assembly fullname="BasisConsoleDisplay" preserve="all" />
@@ -30,11 +29,13 @@
     <assembly fullname="BasisSerializer.OdinSerializer" preserve="all" />
     <assembly fullname="BasisServersProvider" preserve="all" />
     <assembly fullname="BasisSettings" preserve="all" />
-    <assembly fullname="BasisShims" preserve="all" />
+    <assembly fullname="Luau" preserve="all" />
+    <assembly fullname="Luau.Native" preserve="all" />
+    <assembly fullname="Luau.Unity" preserve="all" />
+    <assembly fullname="Minetake.Basis.Luau" preserve="all" />
     <assembly fullname="BasisVehicles" preserve="all" />
     <assembly fullname="BasisVehiclesNetwork" preserve="all" />
     <assembly fullname="BouncyCastle.Cryptography" preserve="all" />
-    <assembly fullname="Cilbox" preserve="all" />
     <assembly fullname="Crypto" preserve="all" />
     <assembly fullname="Did" preserve="all" />
     <assembly fullname="GPUUtilities" preserve="all" />

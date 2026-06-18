@@ -1,0 +1,21 @@
+{
+  "name": "net.minetake.basis.luau",
+  "displayName": "Basis Luau Scripting",
+  "version": "0.1.0",
+  "description": "Luau UGC scripting hosts, proxies, bindings, and services for Basis",
+  "author": {
+    "name": "BasisVR / Minetake"
+  },
+  "hideInEditor": false,
+  "license": "MIT",
+  "dependencies": {
+    "com.unity.mathematics": "1.3.3"
+  },
+  "vpmDependencies": {
+    "net.minetake.luau": "0.1.6-basis.1",
+    "com.basis.framework": "0.0.1",
+    "com.basis.sdk": "0.0.1",
+    "com.basis.server": "1.0.0",
+    "dev.hai-vr.basis.comms": "0.0.1"
+  }
+}

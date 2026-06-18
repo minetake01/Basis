@@ -1,0 +1,3 @@
+<linker>
+  <assembly fullname="Luau.Native" preserve="all" />
+</linker>

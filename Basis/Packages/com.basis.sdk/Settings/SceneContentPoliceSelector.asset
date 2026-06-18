@@ -326,7 +326,11 @@ MonoBehaviour:
   - Basis.Scripts.Vehicles.Parts.BasisVehicleHoverThruster
   - ExampleMovingChair
   - ExampleRotatingChair
-  - Cilbox.CilboxPropBasis
+  - Minetake.Basis.Luau.LuauPropHost
+  - Minetake.Basis.Luau.LuauSceneHost
+  - Minetake.Basis.Luau.LuauAvatarHost
+  - Minetake.Basis.Luau.LuauScriptProxy
+  - Minetake.Basis.Luau.Services.BasisLuauOscHost
   - BasisNetworkedVehicles
   - Basis.Scripts.Vehicles.Parts.BasisVehicleSteeringWheel
   - Basis.Scripts.Vehicles.Parts.BasisVehicleEngineAudio
@@ -342,13 +346,11 @@ MonoBehaviour:
   - Prism.Audio.SpeakerAudioFilter
   - Prism.UI.MediaPlayerUI
   - Basis.Scripts.UI.UI_Panels.BasisUIComponent
-  - Cilbox.CilboxProxy
   - BasisAvatarPedestal
   - BasisNetworkedContent
   - BasisLoadInGameobjectAddressable
   - Basis.Scripts.BasisSdk.Interactions.BasisPlayerInteract
   - UnityEngine.Rendering.Universal.UniversalAdditionalLightData
-  - Cilbox.CilboxSceneBasis
   - VolumetricAdditionalLight
   - GatorDragonGames.JigglePhysics.JiggleRig
   - GatorDragonGames.JigglePhysics.JiggleUpdateExample
@@ -384,5 +386,5 @@ MonoBehaviour:
   - Basis.Scripts.BasisSdk.Interactions.BasisInteractableButton
   - Basis.Shims.MediaPlayerShim
   - Basis.Shims.BasisInteractableShim
-  - Basis.Shims.BasisOsc
+  - Minetake.Basis.Luau.Services.BasisLuauOscHost
   - UnityEngine.Video.VideoPlayer

@@ -94,14 +94,14 @@ namespace Basis.Scripts.Avatar
             public int JiggleCollidersTrimmed;
             /// <summary>Jiggle rigs destroyed at driver ingestion (not by TrimExcessComponents).</summary>
             public int JiggleRigsTrimmed;
-            /// <summary>CilboxProxy script behaviours destroyed by the trim pass.</summary>
-            public int CilboxBehavioursTrimmed;
+            /// <summary>LuauScriptProxy script behaviours destroyed by the trim pass.</summary>
+            public int LuauScriptProxiesTrimmed;
 
             public bool AnythingTrimmed =>
                 AnimatorsTrimmed > 0 || LightsTrimmed > 0 || ParticleSystemsTrimmed > 0
                 || TrailRenderersTrimmed > 0 || LineRenderersTrimmed > 0 || ClothTrimmed > 0
                 || CollidersTrimmed > 0 || JiggleCollidersTrimmed > 0 || JiggleRigsTrimmed > 0
-                || CilboxBehavioursTrimmed > 0;
+                || LuauScriptProxiesTrimmed > 0;
         }
 
         // Component names as emitted by BasisBundleBuild.GenerateMetaData (= Type.Name).
@@ -111,9 +111,9 @@ namespace Basis.Scripts.Avatar
         private const string CompSkinnedMeshRenderer = "SkinnedMeshRenderer";
         private const string CompMeshFilter = "MeshFilter";
         private const string CompJiggleColliderExample = "JiggleColliderExample";
-        // CilboxProxy lives in the com.cnlohr.cilbox package; this assembly does not
+        // LuauScriptProxy lives in net.minetake.basis.luau; trim by short type name.
         // reference it, so the trim and metadata lookups go through the short type name.
-        private const string CompCilboxProxy = "CilboxProxy";
+        private const string CompLuauScriptProxy = "LuauScriptProxy";
 
         // Flag pair per limit. Kept as simple static fields rather than a struct so the
         // settings bridge can patch one value at a time without having to copy + replace
@@ -467,7 +467,7 @@ namespace Basis.Scripts.Avatar
                 UseLimitJiggleBones, LimitJiggleBones, protectedCount: 0, ref anyTighten))
                 return ReconcileAction.Reload;
 
-            if (!TryAccumulateTrim(GetComponentCount(names, CompCilboxProxy), lastInfo.CilboxBehavioursTrimmed,
+            if (!TryAccumulateTrim(GetComponentCount(names, CompLuauScriptProxy), lastInfo.LuauScriptProxiesTrimmed,
                 UseLimitCilboxBehaviours, LimitCilboxBehaviours, protectedCount: 0, ref anyTighten))
                 return ReconcileAction.Reload;
 
@@ -586,11 +586,11 @@ namespace Basis.Scripts.Avatar
                 info.JiggleRigsTrimmed = TrimComponents<JiggleRig>(components, LimitJiggleBones);
             }
 
-            // CilboxProxy is in the com.cnlohr.cilbox package which this assembly does
+            // LuauScriptProxy is in net.minetake.basis.luau which this assembly does
             // not reference, so trim by short type name instead of generic component type.
             if (UseLimitCilboxBehaviours)
             {
-                info.CilboxBehavioursTrimmed = TrimComponentsByName(components, CompCilboxProxy, LimitCilboxBehaviours);
+                info.LuauScriptProxiesTrimmed = TrimComponentsByName(components, CompLuauScriptProxy, LimitCilboxBehaviours);
             }
 
             return info;
