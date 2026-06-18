@@ -1,11 +1,8 @@
 #if UNITY_EDITOR
-using System;
-using System.Text;
 using Basis.Scripts.BasisSdk;
-using Luau;
-using Luau.Unity;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Minetake.Basis.Luau.Editor
 {
@@ -16,75 +13,28 @@ namespace Minetake.Basis.Luau.Editor
         {
             BasisAssetBundlePipeline.OnBeforeBuildPrefab -= HandleBeforeBuildPrefab;
             BasisAssetBundlePipeline.OnBeforeBuildPrefab += HandleBeforeBuildPrefab;
+            BasisAssetBundlePipeline.OnBeforeBuildScene -= HandleBeforeBuildScene;
+            BasisAssetBundlePipeline.OnBeforeBuildScene += HandleBeforeBuildScene;
             BasisAvatarSDKInspector.OnBeforeTestInEditor -= HandleBeforeTestInEditor;
             BasisAvatarSDKInspector.OnBeforeTestInEditor += HandleBeforeTestInEditor;
+            BasisPropSDKInspector.OnBeforeTestInEditor -= HandleBeforeTestInEditor;
+            BasisPropSDKInspector.OnBeforeTestInEditor += HandleBeforeTestInEditor;
         }
 
-        static void HandleBeforeTestInEditor(GameObject prefabRoot) => HandleBeforeBuildPrefab(prefabRoot, null);
+        static void HandleBeforeTestInEditor(GameObject prefabRoot) =>
+            BasisLuauAuthoringConverter.ConvertHierarchy(
+                prefabRoot,
+                BasisLuauAuthoringConverter.ConversionMode.Build);
 
-        static void HandleBeforeBuildPrefab(GameObject prefabRoot, BasisAssetBundleObject settings)
-        {
-            if (prefabRoot == null)
-            {
-                return;
-            }
+        static void HandleBeforeBuildPrefab(GameObject prefabRoot, BasisAssetBundleObject settings) =>
+            BasisLuauAuthoringConverter.ConvertHierarchy(
+                prefabRoot,
+                BasisLuauAuthoringConverter.ConversionMode.Build);
 
-            BasisLuauBehaviour[] behaviours = prefabRoot.GetComponentsInChildren<BasisLuauBehaviour>(true);
-            if (behaviours.Length == 0)
-            {
-                return;
-            }
-
-            LuauHostBase host = prefabRoot.GetComponentInChildren<LuauHostBase>(true);
-            if (host == null)
-            {
-                throw new InvalidOperationException(
-                    $"Basis Luau build failed: '{prefabRoot.name}' contains BasisLuauBehaviour but no LuauHostBase (Prop/Scene/Avatar).");
-            }
-
-            for (int i = 0; i < behaviours.Length; i++)
-            {
-                BasisLuauBehaviour behaviour = behaviours[i];
-                if (behaviour == null)
-                {
-                    continue;
-                }
-
-                if (behaviour.Script == null)
-                {
-                    throw new InvalidOperationException(
-                        $"Basis Luau build failed: BasisLuauBehaviour on '{behaviour.gameObject.name}' has no LuauAsset assigned.");
-                }
-
-                if (behaviour.HostKind != host.HostKind)
-                {
-                    throw new InvalidOperationException(
-                        $"Basis Luau build failed: host kind mismatch on '{behaviour.gameObject.name}'.");
-                }
-
-                byte[] bytecode;
-                if (behaviour.Script.IsPrecompiled)
-                {
-                    bytecode = behaviour.Script.AsSpan().ToArray();
-                }
-                else
-                {
-                    SerializedObject so = new SerializedObject(behaviour.Script);
-                    string source = so.FindProperty("text").stringValue;
-                    bytecode = LuauCompiler.Compile(Encoding.UTF8.GetBytes(source));
-                }
-
-                LuauScriptProxy proxy = behaviour.gameObject.GetComponent<LuauScriptProxy>();
-                if (proxy == null)
-                {
-                    proxy = behaviour.gameObject.AddComponent<LuauScriptProxy>();
-                }
-
-                proxy.Configure(behaviour.HostKind, bytecode, behaviour.HandleSlots, behaviour.gameObject.name);
-                UnityEngine.Object.DestroyImmediate(behaviour, true);
-                EditorUtility.SetDirty(proxy);
-            }
-        }
+        static void HandleBeforeBuildScene(Scene scene, BasisAssetBundleObject settings) =>
+            BasisLuauAuthoringConverter.ConvertScene(
+                scene,
+                BasisLuauAuthoringConverter.ConversionMode.Build);
     }
 }
 #endif
