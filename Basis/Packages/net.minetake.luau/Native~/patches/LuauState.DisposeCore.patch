@@ -1,0 +1,7 @@
+--- a/src/Luau/LuauState.cs
++++ b/src/Luau/LuauState.cs
+@@ -DisposeCore
+-        if (from != null) lua_close(l);
+-        else lua_unref(l, reference);
++        if (from != null) lua_unref(from.AsPointer(), reference);
++        else lua_close(l);

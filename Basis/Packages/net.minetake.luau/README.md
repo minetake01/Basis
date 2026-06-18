@@ -16,21 +16,53 @@ Vendored [nuskey8/luau-dotnet](https://github.com/nuskey8/luau-dotnet) for Basis
 
 UPM package name is `net.minetake.luau` only.
 
-## Native execution limits
+## Native execution limits (v5)
 
-`Native~/basis_luau_limits.c` provides interrupt (`luaL_error` in native only) and custom `lua_Alloc` hard memory cap.
+Three binaries must match on each platform:
 
-Rebuild native plugins after changing limits sources:
+| Binary | Role |
+|--------|------|
+| `libluau.dll` / `.so` / `.dylib` | Patched luau-dotnet FFI (`ffi_luaL_error_msg`, Rust link anchor) |
+| `Luau.dll` | Patched managed bindings (`LuauState.DisposeCore`: child `lua_unref`, root `lua_close`) |
+| `basis_luau_limits` | Interrupt + custom `lua_Alloc` memory cap (links `ffi_lua_*` only) |
+
+`basis_luau_close_state` and C# raw pointer ownership are **not** used. Limits context is freed automatically when the root VM is closed via `LuauState.Dispose()`.
+
+### Windows x64 (Editor)
+
+Prerequisites: Visual Studio 2022 C++ workload, Rust (`x86_64-pc-windows-msvc`), CMake (VS component or PATH), libclang (LLVM / `scoop install llvm`), .NET 9 SDK (or `~/.dotnet/sdk9` via [dotnet-install](https://dot.net/v1/dotnet-install.ps1)).
+
+```powershell
+./Native~/build-libluau.ps1
+```
+
+Build artifacts use short paths (`C:\lb\luau`, `C:\lb\cargo-target`) to avoid Windows MAX_PATH issues during CMake.
+
+If Unity/Cursor locks plugin DLLs, outputs are written as `*.dll.built`. Deploy when unlocked (copies `libluau`, `luau`, and `basis_luau_limits` — limits links against `luau.dll` at load time):
+
+```powershell
+./Native~/deploy-built.ps1
+```
+
+Limits-only rebuild (after libluau is already built):
 
 ```powershell
 ./Native~/build.ps1
 ```
 
-```bash
-./Native~/build.sh
+Smoke test:
+
+```powershell
+./Native~/test-limits.ps1
 ```
 
-Exports are linked into `libluau` (same `ffi_*` surface as luau-dotnet). Until rebuilt, Editor uses the stock prebuilt `libluau` binaries; limits FFI entry points require a native rebuild per platform.
+### Linux / macOS (CI matrix)
+
+```bash
+./Native~/build-libluau.sh linux-x64
+./Native~/build-libluau.sh linux-arm64
+./Native~/build-libluau.sh osx
+```
 
 ## Platforms
 

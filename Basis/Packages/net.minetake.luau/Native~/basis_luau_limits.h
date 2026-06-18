@@ -23,6 +23,13 @@ typedef struct basis_luau_limits_config {
     uint64_t memory_cap_bytes;
 } basis_luau_limits_config;
 
+typedef enum basis_luau_init_error {
+    basis_luau_init_none = 0,
+    basis_luau_init_invalid_config = 1,
+    basis_luau_init_ctx_alloc_failed = 2,
+    basis_luau_init_vm_alloc_failed = 3,
+} basis_luau_init_error;
+
 typedef enum basis_luau_disable_reason {
     basis_luau_disable_none = 0,
     basis_luau_disable_timeout = 1,
@@ -31,13 +38,12 @@ typedef enum basis_luau_disable_reason {
     basis_luau_disable_internal = 4,
 } basis_luau_disable_reason;
 
-/* Creates a root state with custom allocator + native interrupt hook installed. */
-BASIS_LUAU_API lua_State* basis_luau_newstate_with_limits(const basis_luau_limits_config* config);
+BASIS_LUAU_API lua_State* basis_luau_newstate_with_limits(
+    const basis_luau_limits_config* config,
+    basis_luau_init_error* out_error);
 
-/* Sets monotonic deadline (nanoseconds). 0 disables time limit until next BeginExecution. */
 BASIS_LUAU_API void basis_luau_set_execution_deadline(lua_State* L, int64_t deadline_ns_monotonic);
 
-/* Call immediately before a protected script invocation. */
 BASIS_LUAU_API void basis_luau_begin_execution(lua_State* L, int64_t budget_ns);
 
 BASIS_LUAU_API void basis_luau_end_execution(lua_State* L);

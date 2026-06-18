@@ -1,0 +1,64 @@
+name: Luau native plugins
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Basis/Packages/net.minetake.luau/Native~/**'
+      - 'Basis/Packages/net.minetake.luau/Native/**'
+      - '.github/workflows/luau-native.yml'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install LLVM (libclang)
+        run: choco install llvm -y
+      - name: Build Windows x64 natives
+        shell: pwsh
+        run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.ps1
+      - name: Smoke test limits
+        shell: pwsh
+        run: ./Basis/Packages/net.minetake.luau/Native~/test-limits.ps1
+
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y clang cmake build-essential
+      - name: Build linux-x64 natives
+        run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.sh linux-x64
+
+  linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y clang cmake build-essential gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - name: Build linux-arm64 natives
+        run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.sh linux-arm64
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build macOS natives
+        run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.sh osx
