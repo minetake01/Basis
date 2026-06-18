@@ -96,7 +96,7 @@ MonoBehaviour:
     - path: LICENSE
       spdx: MIT
       overrideProductName:
-  - packageName: com.cnlohr.cilbox
+  - packageName: net.minetake.luau
     licenses:
     - path: LICENSE
       spdx: MIT
@@ -127,7 +127,7 @@ MonoBehaviour:
   - com.basis.profilerintergration
   - com.basis.server
   - com.basis.settings
-  - com.basis.shim
+  - net.minetake.basis.luau
   - com.basis.vehicles
   - com.basis.visualtrackers
   baked:
@@ -491,7 +491,7 @@ MonoBehaviour:
 '
     licenseUrl: https://github.com/BasisVR/Basis/tree/developer/Basis/Packages/org.basisvr.bouncycastle/LICENSE
   - productName: Cilbox
-    packageName: com.cnlohr.cilbox
+    packageName: net.minetake.luau
     licensePath: LICENSE
     spdx: MIT
     fullLicenseName: MIT License
@@ -558,7 +558,7 @@ MonoBehaviour:
       SOFTWARE.
 
 '
-    licenseUrl: https://github.com/BasisVR/Basis/tree/developer/Basis/Packages/com.cnlohr.cilbox/LICENSE
+    licenseUrl: https://github.com/nuskey8/luau-dotnet
   - productName: Generator.Equals
     packageName: org.basisvr.generator.equals
     licensePath: LICENSE

@@ -5,11 +5,9 @@ using System.Collections.Generic;
 using System.Reflection;
 using Basis.BasisUI;
 using Basis.Network.Core;
-using Basis.Shims;
 using Basis.Scripts.BasisSdk;
 using Basis.Scripts.Networking.Compression;
-using Cilbox;
-using HVR.Basis.Comms;
+using Minetake.Basis.Luau.Services;
 using HVR.Basis.Comms.OSC;
 using HVR.Basis.Comms.OSC.Lyuma;
 using NUnit.Framework;
@@ -110,7 +108,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_FiltersExactAndPrefixSubscriptions()
+        public void BasisLuauOscHost_FiltersExactAndPrefixSubscriptions()
         {
             GameObject go = new GameObject("OscShimTest");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -118,7 +116,7 @@ namespace HVR.Basis.Comms.Tests
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -143,7 +141,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_NormalizesAvatarParameterSubscriptions()
+        public void BasisLuauOscHost_NormalizesAvatarParameterSubscriptions()
         {
             GameObject go = new GameObject("OscShimNormalizeTest");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -151,7 +149,7 @@ namespace HVR.Basis.Comms.Tests
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -173,7 +171,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_SubscribeWithCallback_InvokesExactHandler()
+        public void BasisLuauOscHost_SubscribeWithCallback_InvokesExactHandler()
         {
             GameObject go = new GameObject("OscShimCallbackTest");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -181,7 +179,7 @@ namespace HVR.Basis.Comms.Tests
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.Subscribe("/avatar/parameters/Callback", (message, arguments) =>
@@ -209,7 +207,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_SubmitRawMessages_DeliversRepeatedPackets()
+        public void BasisLuauOscHost_SubmitRawMessages_DeliversRepeatedPackets()
         {
             GameObject go = new GameObject("OscShimRepeatedRawCallbackTest");
             MethodInfo submitRawMessages = typeof(BasisOscService).GetMethod("SubmitRawMessages", BindingFlags.NonPublic | BindingFlags.Static);
@@ -217,7 +215,7 @@ namespace HVR.Basis.Comms.Tests
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
                 float lastValue = 0f;
 
@@ -261,7 +259,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_SubscribeValue_InvokesFirstArgument()
+        public void BasisLuauOscHost_SubscribeValue_InvokesFirstArgument()
         {
             GameObject go = new GameObject("OscShimValueCallbackTest");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -269,7 +267,7 @@ namespace HVR.Basis.Comms.Tests
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 OscData received = null;
 
                 shim.SubscribeValue("/avatar/parameters/ValueCallback", value => received = value);
@@ -294,7 +292,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_SubscribeValue_DoesNotInvokeForEmptyArgumentMessages()
+        public void BasisLuauOscHost_SubscribeValue_DoesNotInvokeForEmptyArgumentMessages()
         {
             GameObject go = new GameObject("OscShimEmptyValueCallbackTest");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -302,7 +300,7 @@ namespace HVR.Basis.Comms.Tests
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 bool called = false;
 
                 shim.SubscribeValue("/avatar/parameters/ValueCallback", value => called = true);
@@ -365,13 +363,9 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void CilboxWhitelists_AllowDirectOscTypes()
+        public void LuauOscHost_IsAvailableForCommsTests()
         {
-            Assert.That(new CilboxSceneBasis().CheckTypeAllowed("HVR.Basis.Comms.OSC.OscMessage"), Is.True);
-            Assert.That(new CilboxPropBasis().CheckTypeAllowed("HVR.Basis.Comms.OSC.OscData"), Is.True);
-            Assert.That(new CilboxAvatarBasis().CheckTypeAllowed("HVR.Basis.Comms.OSC.OscDataKind"), Is.True);
-            Assert.That(new CilboxAvatarBasis().CheckTypeAllowed("Basis.Shims.BasisOsc"), Is.True);
-            Assert.That(new CilboxAvatarBasis().CheckTypeAllowed("Basis.Shims.BasisOsc+OscValueEvent"), Is.True);
+            Assert.That(typeof(BasisLuauOscHost).Assembly.GetName().Name, Is.EqualTo("Minetake.Basis.Luau"));
         }
 
         [Test]
@@ -420,14 +414,14 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_Subscribe_RegistersExactAddressInNodeMap()
+        public void BasisLuauOscHost_Subscribe_RegistersExactAddressInNodeMap()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("OscExactQueryRegistration");
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.Subscribe("Face/Smile", (message, arguments) => { });
 
                 object leaf = ResolveNode(GetQueryRoot(), "avatar", "parameters", "Face", "Smile");
@@ -443,13 +437,13 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_SubscribeWithCallback_ReturnsResolvedRelativeAddress()
+        public void BasisLuauOscHost_SubscribeWithCallback_ReturnsResolvedRelativeAddress()
         {
             GameObject go = new GameObject("OscResolvedSubscribe");
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.Subscribe("Face/Smile", (message, arguments) => { }, out string resolvedAddress);
 
                 Assert.That(resolvedAddress, Is.EqualTo("/avatar/parameters/Face/Smile"));
@@ -462,7 +456,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_Subscribe_LocalOnlyOnRemoteAvatar_DoesNotRegisterOrInvoke()
+        public void BasisLuauOscHost_Subscribe_LocalOnlyOnRemoteAvatar_DoesNotRegisterOrInvoke()
         {
             GameObject go = new GameObject("RemoteAvatarLocalOnlySubscribe");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -473,7 +467,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.Subscribe("Blocked", (message, arguments) => callCount++, true, out string resolvedAddress);
@@ -499,7 +493,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_SubscribeValue_LocalOnlyOnRemoteAvatar_DoesNotRegisterOrInvoke()
+        public void BasisLuauOscHost_SubscribeValue_LocalOnlyOnRemoteAvatar_DoesNotRegisterOrInvoke()
         {
             GameObject go = new GameObject("RemoteAvatarLocalOnlyValueSubscribe");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -510,7 +504,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 bool called = false;
 
                 shim.SubscribeValue("Blocked", value => called = true, true, out string resolvedAddress);
@@ -536,7 +530,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_RemoteAvatarSubscription_RegistersNormalizedPublicAddressInNodeMap()
+        public void BasisLuauOscHost_RemoteAvatarSubscription_RegistersNormalizedPublicAddressInNodeMap()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("RemoteAvatarQueryRegistration");
@@ -546,7 +540,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.Subscribe("/avatar/parameters/Blocked", (message, arguments) => { });
 
                 Assert.That(ResolveNode(GetQueryRoot(), "avatar", "parameters", "Blocked"), Is.Null);
@@ -564,7 +558,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_RemoteAvatarSubscriptionWithCallback_ReturnsNormalizedPublicAddress()
+        public void BasisLuauOscHost_RemoteAvatarSubscriptionWithCallback_ReturnsNormalizedPublicAddress()
         {
             GameObject go = new GameObject("RemoteAvatarResolvedSubscribe");
 
@@ -573,7 +567,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.Subscribe("/avatar/parameters/Blocked", (message, arguments) => { }, out string resolvedAddress);
 
                 Assert.That(resolvedAddress, Is.EqualTo("/avatar/public/Blocked"));
@@ -586,7 +580,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_LocalAvatarPublishesIntoAvatarNamespace()
+        public void BasisLuauOscHost_LocalAvatarPublishesIntoAvatarNamespace()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("AvatarPublisher");
@@ -596,7 +590,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = true;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.PublishValue("Face/Smile", OscData.Float32(1f));
 
                 object leaf = ResolveNode(GetQueryRoot(), "avatar", "parameters", "Face", "Smile");
@@ -611,7 +605,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_LocalAvatarPublishValue_SubmitsFloatIntoVixxyVariableStore()
+        public void BasisLuauOscHost_LocalAvatarPublishValue_SubmitsFloatIntoVixxyVariableStore()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("AvatarVixxyPublisher");
@@ -621,7 +615,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = true;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.PublishValue("Face/Smile", OscData.Float32(0.75f));
 
                 int addressId = HVRAddress.AddressToId("Face/Smile");
@@ -747,7 +741,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_PublishValue_ReturnsResolvedRelativeAddress()
+        public void BasisLuauOscHost_PublishValue_ReturnsResolvedRelativeAddress()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("AvatarResolvedPublisher");
@@ -757,7 +751,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = true;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.PublishValue("Face/Smile", OscData.Float32(1f), out string resolvedAddress);
 
                 Assert.That(resolvedAddress, Is.EqualTo("/avatar/parameters/Face/Smile"));
@@ -770,7 +764,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_RemoteAvatarDoesNotPublish()
+        public void BasisLuauOscHost_RemoteAvatarDoesNotPublish()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("RemoteAvatarPublisher");
@@ -780,7 +774,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.PublishValue("Blocked", OscData.Float32(1f));
 
                 Assert.That(GetSceneInstanceField(GetServerType()).GetValue(null), Is.Not.Null);
@@ -795,7 +789,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_OnEnable_InitializesOscAcquisitionServer_WithoutFaceTracking()
+        public void BasisLuauOscHost_OnEnable_InitializesOscAcquisitionServer_WithoutFaceTracking()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("OscShimOnly");
@@ -804,7 +798,7 @@ namespace HVR.Basis.Comms.Tests
             {
                 Assert.That(GetSceneInstanceField(GetServerType()).GetValue(null), Is.Null);
 
-                go.AddComponent<BasisOsc>();
+                go.AddComponent<BasisLuauOscHost>();
 
                 Assert.That(GetSceneInstanceField(GetServerType()).GetValue(null), Is.Not.Null);
             }
@@ -850,7 +844,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_RemoteAvatarSubscriptions_OnlyReceiveAvatarPublic()
+        public void BasisLuauOscHost_RemoteAvatarSubscriptions_OnlyReceiveAvatarPublic()
         {
             GameObject go = new GameObject("RemoteAvatarSubscriber");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -861,7 +855,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -882,7 +876,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_RemoteAvatarPrefixSubscriptions_OnlyReceiveAvatarPublic()
+        public void BasisLuauOscHost_RemoteAvatarPrefixSubscriptions_OnlyReceiveAvatarPublic()
         {
             GameObject go = new GameObject("RemoteAvatarPrefixSubscriber");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -893,7 +887,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -914,7 +908,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_ReceiveAll_LocalAvatar_IsScopedToAvatarParameters()
+        public void BasisLuauOscHost_ReceiveAll_LocalAvatar_IsScopedToAvatarParameters()
         {
             GameObject go = new GameObject("ReceiveAllLocalAvatar");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -925,7 +919,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = true;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -944,7 +938,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_ReceiveAll_RemoteAvatar_IsScopedToAvatarPublic()
+        public void BasisLuauOscHost_ReceiveAll_RemoteAvatar_IsScopedToAvatarPublic()
         {
             GameObject go = new GameObject("ReceiveAllRemoteAvatar");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -955,7 +949,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = false;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -974,7 +968,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_PrefixSubscriptions_RequireSegmentBoundary()
+        public void BasisLuauOscHost_PrefixSubscriptions_RequireSegmentBoundary()
         {
             GameObject go = new GameObject("PrefixBoundarySubscriber");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -982,7 +976,7 @@ namespace HVR.Basis.Comms.Tests
 
             try
             {
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -1000,7 +994,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_PropPublishesWithInstanceScopedPath()
+        public void BasisLuauOscHost_PropPublishesWithInstanceScopedPath()
         {
             DestroySceneInstance();
             GameObject goA = new GameObject("Prop");
@@ -1010,11 +1004,11 @@ namespace HVR.Basis.Comms.Tests
             {
                 BasisProp propA = goA.AddComponent<BasisProp>();
                 propA.AssignNetworkGUIDIdentifier("prop-one");
-                BasisOsc shimA = goA.AddComponent<BasisOsc>();
+                BasisLuauOscHost shimA = goA.AddComponent<BasisLuauOscHost>();
 
                 BasisProp propB = goB.AddComponent<BasisProp>();
                 propB.AssignNetworkGUIDIdentifier("prop-two");
-                BasisOsc shimB = goB.AddComponent<BasisOsc>();
+                BasisLuauOscHost shimB = goB.AddComponent<BasisLuauOscHost>();
 
                 shimA.PublishValue("Status", OscData.String("alpha"));
                 shimB.PublishValue("Status", OscData.String("beta"));
@@ -1035,7 +1029,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_PropUnderRemoteAvatar_PublishesToPropNamespace()
+        public void BasisLuauOscHost_PropUnderRemoteAvatar_PublishesToPropNamespace()
         {
             DestroySceneInstance();
             GameObject avatarRoot = new GameObject("RemoteAvatarRoot");
@@ -1050,7 +1044,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisProp prop = propChild.AddComponent<BasisProp>();
                 prop.AssignNetworkGUIDIdentifier("prop-under-remote-avatar");
 
-                BasisOsc shim = propChild.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = propChild.AddComponent<BasisLuauOscHost>();
                 shim.PublishValue("Status", OscData.String("held"));
 
                 object propLeaf = ResolveNode(GetQueryRoot(), "prop", "prop-under-remote-avatar", "parameters", "Status");
@@ -1067,7 +1061,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_PropSubscriptions_OnlyReceiveAvatarPublic()
+        public void BasisLuauOscHost_PropSubscriptions_OnlyReceiveAvatarPublic()
         {
             GameObject go = new GameObject("PropSubscriber");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -1076,7 +1070,7 @@ namespace HVR.Basis.Comms.Tests
             try
             {
                 go.AddComponent<BasisProp>();
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -1099,7 +1093,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_SceneSubscriptions_OnlyReceiveAvatarPublic()
+        public void BasisLuauOscHost_SceneSubscriptions_OnlyReceiveAvatarPublic()
         {
             GameObject go = new GameObject("SceneSubscriber");
             MethodInfo publish = typeof(BasisOscService).GetMethod("Publish", BindingFlags.NonPublic | BindingFlags.Static);
@@ -1108,7 +1102,7 @@ namespace HVR.Basis.Comms.Tests
             try
             {
                 go.AddComponent<BasisScene>();
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 int callCount = 0;
 
                 shim.OnMessage = (message, arguments) => callCount++;
@@ -1131,7 +1125,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_ResolvePublishAddress_RequiresSegmentBoundary()
+        public void BasisLuauOscHost_ResolvePublishAddress_RequiresSegmentBoundary()
         {
             GameObject go = new GameObject("PropPublisher");
 
@@ -1140,8 +1134,8 @@ namespace HVR.Basis.Comms.Tests
                 BasisProp prop = go.AddComponent<BasisProp>();
                 prop.AssignNetworkGUIDIdentifier("prop-one");
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
-                MethodInfo resolvePublishAddress = typeof(BasisOsc).GetMethod("ResolvePublishAddress", BindingFlags.NonPublic | BindingFlags.Instance);
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
+                MethodInfo resolvePublishAddress = typeof(BasisLuauOscHost).GetMethod("ResolvePublishAddress", BindingFlags.NonPublic | BindingFlags.Instance);
                 Assert.That(resolvePublishAddress, Is.Not.Null);
 
                 // Absolute-looking paths that miss the scoped prefix on a segment boundary are intentionally treated as relative containment.
@@ -1155,7 +1149,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_ScenePublishesWithScopedPath_AndQueryBranchResolves()
+        public void BasisLuauOscHost_ScenePublishesWithScopedPath_AndQueryBranchResolves()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("ScenePublisher");
@@ -1164,7 +1158,7 @@ namespace HVR.Basis.Comms.Tests
             {
                 BasisScene scene = go.AddComponent<BasisScene>();
                 scene.AssignNetworkGUIDIdentifier("scene-one");
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
 
                 shim.PublishValue("Environment/Ambient", OscData.String("night"));
 
@@ -1187,7 +1181,7 @@ namespace HVR.Basis.Comms.Tests
         }
 
         [Test]
-        public void BasisOsc_LocalAvatarCanPublishToAvatarPublicNamespace()
+        public void BasisLuauOscHost_LocalAvatarCanPublishToAvatarPublicNamespace()
         {
             DestroySceneInstance();
             GameObject go = new GameObject("AvatarPublicPublisher");
@@ -1197,7 +1191,7 @@ namespace HVR.Basis.Comms.Tests
                 BasisAvatar avatar = go.AddComponent<BasisAvatar>();
                 avatar.IsOwnedLocally = true;
 
-                BasisOsc shim = go.AddComponent<BasisOsc>();
+                BasisLuauOscHost shim = go.AddComponent<BasisLuauOscHost>();
                 shim.PublishValue("/avatar/public/Status", OscData.String("shareable"));
 
                 object leaf = ResolveNode(GetQueryRoot(), "avatar", "public", "Status");

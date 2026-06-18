@@ -6,8 +6,7 @@
         "Basis Framework",
         "BasisNetworkCore",
         "BasisSDK",
-        "BasisShims",
-        "Cilbox",
+        "Minetake.Basis.Luau",
         "UnityEngine.TestRunner"
     ],
     "includePlatforms": [],
@@ -15,7 +14,8 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "nunit.framework.dll"
+        "nunit.framework.dll",
+        "Luau.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
