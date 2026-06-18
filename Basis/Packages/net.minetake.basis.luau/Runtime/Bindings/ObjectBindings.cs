@@ -89,8 +89,10 @@ namespace Minetake.Basis.Luau.Bindings
         }
 
         [LuauMember("call")]
-        public static LuauValue Call(double handleRaw, string methodName, params LuauValue[] args)
+        public static LuauValue Call([FromLuauState] LuauState state)
         {
+            ReadInvocation(state, out LuauValue target, out string methodName, out LuauValue[] args);
+            double handleRaw = target.Read<double>();
             if (!TryResolveObject(handleRaw, out UnityEngine.Object obj) || string.IsNullOrEmpty(methodName))
             {
                 return default;
@@ -100,8 +102,10 @@ namespace Minetake.Basis.Luau.Bindings
         }
 
         [LuauMember("callStatic")]
-        public static LuauValue CallStatic(string typeName, string methodName, params LuauValue[] args)
+        public static LuauValue CallStatic([FromLuauState] LuauState state)
         {
+            ReadInvocation(state, out LuauValue target, out string methodName, out LuauValue[] args);
+            string typeName = target.Read<string>();
             var host = LuauBindingContext.Host;
             if (host == null || string.IsNullOrEmpty(typeName) || string.IsNullOrEmpty(methodName))
             {
@@ -115,6 +119,27 @@ namespace Minetake.Basis.Luau.Bindings
             }
 
             return InvokeMethod(host, null, type, methodName, args, true);
+        }
+
+        static void ReadInvocation(
+            LuauState state,
+            out LuauValue target,
+            out string methodName,
+            out LuauValue[] args)
+        {
+            int count = state?.GetTop() ?? 0;
+            if (count < 2)
+            {
+                throw new LuauException("basis_object invocation requires a target and method name");
+            }
+
+            target = state.ToValue(1);
+            methodName = state.ToValue(2).Read<string>();
+            args = new LuauValue[count - 2];
+            for (int i = 0; i < args.Length; i++)
+            {
+                args[i] = state.ToValue(i + 3);
+            }
         }
 
         [LuauMember("getComponent")]

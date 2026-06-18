@@ -11,8 +11,6 @@ namespace Minetake.Basis.Luau
 {
     public abstract class LuauHostBase : MonoBehaviour
     {
-        [SerializeField] LuauHostKind hostKind;
-
         protected abstract LuauHostKind DefaultHostKind { get; }
 
         readonly LuauObjectRegistry _registry = new();
@@ -23,7 +21,7 @@ namespace Minetake.Basis.Luau
         LuauState _rootState;
         bool _stateDestroyed;
 
-        public LuauHostKind HostKind => hostKind;
+        public LuauHostKind HostKind => DefaultHostKind;
         public LuauObjectRegistry Registry => _registry;
         public LuauCallbackRegistry Callbacks => _callbacks;
         public LuauCapability Capability { get; private set; }
@@ -32,9 +30,8 @@ namespace Minetake.Basis.Luau
 
         protected virtual void Awake()
         {
-            hostKind = DefaultHostKind;
-            Policy = LuauWhitelistPolicy.ForHost(hostKind);
-            Capability = new LuauCapability(hostKind, transform, Policy);
+            Policy = LuauWhitelistPolicy.ForHost(HostKind);
+            Capability = new LuauCapability(HostKind, transform, Policy);
             InitializeStateIfNeeded();
         }
 
@@ -72,7 +69,7 @@ namespace Minetake.Basis.Luau
                 return;
             }
 
-            Policy ??= LuauWhitelistPolicy.ForHost(hostKind);
+            Policy ??= LuauWhitelistPolicy.ForHost(HostKind);
             _limits = new LuauExecutionLimits();
             _rootState = _limits.CreateLimitedState();
             RegisterStandardLibraries(_rootState);
@@ -142,20 +139,50 @@ namespace Minetake.Basis.Luau
             return InvokeProtected(proxy, function, args);
         }
 
-        ProtectedCallResult InvokeProtected(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args)
+        internal ProtectedInvokeResult InvokeProtectedWithResults(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args)
+        {
+            if (_stateDestroyed || proxy == null || !proxy.IsEnabled || function == null)
+            {
+                return default;
+            }
+
+            return InvokeProtectedCore(proxy, function, args, handleFailure: true);
+        }
+
+        internal ProtectedInvokeResult InvokeProtectedModuleLoad(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args)
+        {
+            if (_stateDestroyed || proxy == null || function == null)
+            {
+                return default;
+            }
+
+            return InvokeProtectedCore(proxy, function, args, handleFailure: false);
+        }
+
+        ProtectedInvokeResult InvokeProtectedCore(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args, bool handleFailure)
         {
             LuauBindingContext.Host = this;
             LuauBindingContext.Proxy = proxy;
             try
             {
-                ProtectedCallResult result = _limits.InvokeProtected(_rootState, function, args);
-                HandleFailure(proxy, result);
+                LuauState state = proxy.ThreadState ?? _rootState;
+                ProtectedInvokeResult result = _limits.InvokeProtectedWithResults(state, function, args);
+                if (handleFailure)
+                {
+                    HandleFailure(proxy, result.Call);
+                }
+
                 return result;
             }
             finally
             {
                 LuauBindingContext.Clear();
             }
+        }
+
+        ProtectedCallResult InvokeProtected(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args)
+        {
+            return InvokeProtectedWithResults(proxy, function, args).Call;
         }
 
         void HandleFailure(LuauScriptProxy proxy, ProtectedCallResult result)
@@ -195,6 +222,11 @@ namespace Minetake.Basis.Luau
             for (int i = 0; i < _proxies.Count; i++)
             {
                 _proxies[i].Disable(reason, message);
+            }
+
+            for (int i = 0; i < _proxies.Count; i++)
+            {
+                _proxies[i].ReleaseThreadState();
             }
 
             _registry.Dispose();

@@ -20,6 +20,7 @@ namespace Minetake.Basis.Luau
         static readonly LuauValue[] EmptyArgs = Array.Empty<LuauValue>();
 
         [SerializeField] LuauHostKind requiredHostKind;
+        [SerializeField] LuauHostBase boundHost;
         [SerializeField] byte[] bytecode;
         [SerializeField] UnityEngine.Object[] slotObjects = Array.Empty<UnityEngine.Object>();
         [SerializeField] ulong[] handleRaws = Array.Empty<ulong>();
@@ -31,25 +32,55 @@ namespace Minetake.Basis.Luau
         readonly Dictionary<string, LuauFunction> _functions = new(StringComparer.Ordinal);
         bool _enabled = true;
         bool _loaded;
+        bool _awakeInvoked;
+        bool _onEnableInvoked;
         string _disableReason;
 
         public bool IsEnabled => _enabled && _loaded;
         public LuauHostKind RequiredHostKind => requiredHostKind;
+        public LuauHostBase BoundHost => boundHost;
         public byte[] Bytecode => bytecode;
+        internal LuauState ThreadState => _thread;
 
-        public void Configure(LuauHostKind hostKind, byte[] compiledBytecode, UnityEngine.Object[] slots, string name)
+        public void Configure(
+            LuauHostKind hostKind,
+            byte[] compiledBytecode,
+            UnityEngine.Object[] slots,
+            string name,
+            LuauHostBase host)
         {
+            if (host == null)
+            {
+                throw new ArgumentNullException(nameof(host));
+            }
+
             requiredHostKind = hostKind;
+            boundHost = host;
             bytecode = compiledBytecode;
             slotObjects = slots ?? Array.Empty<UnityEngine.Object>();
             moduleName = string.IsNullOrWhiteSpace(name) ? "script" : name;
             handleRaws = Array.Empty<ulong>();
+            if (Application.isPlaying && isActiveAndEnabled)
+            {
+                if (TryLoad())
+                {
+                    InvokeAwakeIfNeeded();
+                    InvokeOnEnableIfNeeded();
+                }
+            }
         }
 
         void Awake()
         {
-            TryLoad();
-            _host?.InvokeLifecycle(this, "awake", EmptyArgs);
+            if (!HasConfiguration())
+            {
+                return;
+            }
+
+            if (TryLoad())
+            {
+                InvokeAwakeIfNeeded();
+            }
         }
 
         void Start() => _host?.InvokeLifecycle(this, "start", EmptyArgs);
@@ -60,14 +91,28 @@ namespace Minetake.Basis.Luau
 
         void LateUpdate() => _host?.InvokeLifecycle(this, "lateUpdate", SpanWith(Time.deltaTime));
 
-        void OnEnable() => _host?.InvokeLifecycle(this, "onEnable", EmptyArgs);
+        void OnEnable() => InvokeOnEnableIfNeeded();
 
-        void OnDisable() => _host?.InvokeLifecycle(this, "onDisable", EmptyArgs);
+        void OnDisable()
+        {
+            if (!_onEnableInvoked)
+            {
+                return;
+            }
+
+            _host?.InvokeLifecycle(this, "onDisable", EmptyArgs);
+            _onEnableInvoked = false;
+        }
 
         void OnDestroy()
         {
             _host?.InvokeLifecycle(this, "onDestroy", EmptyArgs);
             _host?.UnregisterProxy(this);
+            ReleaseThreadState();
+        }
+
+        internal void ReleaseThreadState()
+        {
             _thread?.Dispose();
             _thread = null;
             _module = null;
@@ -102,6 +147,30 @@ namespace Minetake.Basis.Luau
             _functions.Clear();
         }
 
+        void InvokeAwakeIfNeeded()
+        {
+            if (_awakeInvoked)
+            {
+                return;
+            }
+
+            _awakeInvoked = true;
+            _host?.InvokeLifecycle(this, "awake", EmptyArgs);
+        }
+
+        void InvokeOnEnableIfNeeded()
+        {
+            if (_onEnableInvoked || !_loaded)
+            {
+                return;
+            }
+
+            _onEnableInvoked = true;
+            _host?.InvokeLifecycle(this, "onEnable", EmptyArgs);
+        }
+
+        bool HasConfiguration() => boundHost != null && bytecode is { Length: > 0 };
+
         bool TryLoad()
         {
             if (_loaded || !_enabled)
@@ -109,10 +178,15 @@ namespace Minetake.Basis.Luau
                 return _loaded;
             }
 
-            _host = GetComponentInParent<LuauHostBase>(true);
+            if (!HasConfiguration())
+            {
+                return false;
+            }
+
+            _host = boundHost;
             if (_host == null)
             {
-                Disable(LuauDisableReason.Internal, "no LuauHostBase in parent hierarchy");
+                Disable(LuauDisableReason.Internal, "boundHost is not assigned");
                 return false;
             }
 
@@ -134,9 +208,18 @@ namespace Minetake.Basis.Luau
 
             _thread = _host.CreateSandboxedThread();
             LuauFunction chunk = _thread.Load(bytecode, moduleName);
-            LuauValue[] results = chunk.InvokeAsync(EmptyArgs).AsTask().GetAwaiter().GetResult();
+            ProtectedInvokeResult invokeResult = _host.InvokeProtectedModuleLoad(this, chunk, EmptyArgs);
+            if (!invokeResult.Call.Success)
+            {
+                ReleaseThreadState();
+                Disable(invokeResult.Call.Reason, invokeResult.Call.ErrorMessage);
+                return false;
+            }
+
+            LuauValue[] results = invokeResult.ReturnValues;
             if (results == null || results.Length == 0 || results[0].Type != LuauType.Table)
             {
+                ReleaseThreadState();
                 Disable(LuauDisableReason.Internal, "module must export a table");
                 return false;
             }
