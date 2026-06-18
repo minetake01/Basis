@@ -1,7 +1,6 @@
 using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Luau;
 using Luau.Native;
 
@@ -24,8 +23,16 @@ namespace Luau.Unity
         public bool RecoveredViaProtectedCall { get; init; }
     }
 
+    public readonly struct ProtectedInvokeResult
+    {
+        public ProtectedCallResult Call { get; init; }
+        public LuauValue[] ReturnValues { get; init; }
+    }
+
     public sealed unsafe class LuauExecutionLimits : IDisposable
     {
+        const long MaxBudgetNs = 3_600_000_000_000L;
+
         delegate LuauState CreateStateInternalDelegate(lua_State* ptr);
 
         static readonly MethodInfo CreateStateInternal = typeof(LuauState).GetMethod(
@@ -40,64 +47,102 @@ namespace Luau.Unity
 
         public LuauState CreateLimitedState()
         {
-            var config = new BasisLuauLimitsConfig
+            try
             {
-                memory_cap_bytes = MemoryBudgetBytes,
-            };
+                var config = new BasisLuauLimitsConfig
+                {
+                    memory_cap_bytes = MemoryBudgetBytes,
+                };
 
-            lua_State* ptr = BasisLuauNative.basis_luau_newstate_with_limits(ref config);
-            if (ptr == null)
-            {
-                throw new InvalidOperationException("basis_luau_newstate_with_limits failed. Rebuild Native~/basis_luau_limits for this platform.");
+                basis_luau_init_error initError = basis_luau_init_error.None;
+                lua_State* ptr = BasisLuauNative.basis_luau_newstate_with_limits(ref config, &initError);
+                if (ptr == null)
+                {
+                    throw CreateInitException(initError);
+                }
+
+                if (CreateStateInternal == null)
+                {
+                    throw new InvalidOperationException("LuauState.CreateStateInternal reflection failed.");
+                }
+
+                return ((CreateStateInternalDelegate)Delegate.CreateDelegate(typeof(CreateStateInternalDelegate), CreateStateInternal))(ptr);
             }
-
-            if (CreateStateInternal == null)
+            catch (DllNotFoundException ex)
             {
-                BasisLuauNative.basis_luau_end_execution(ptr);
-                throw new InvalidOperationException("LuauState.CreateStateInternal reflection failed.");
+                throw new InvalidOperationException(
+                    "Failed to load basis_luau_limits or libluau. Rebuild Native~/build-libluau.ps1 for this platform.",
+                    ex);
             }
-
-            return ((CreateStateInternalDelegate)Delegate.CreateDelegate(typeof(CreateStateInternalDelegate), CreateStateInternal))(ptr);
+            catch (EntryPointNotFoundException ex)
+            {
+                throw new InvalidOperationException(
+                    "basis_luau_limits export mismatch. Rebuild Native~/build.ps1.",
+                    ex);
+            }
+            catch (BadImageFormatException ex)
+            {
+                throw new InvalidOperationException(
+                    "basis_luau_limits or libluau ABI/architecture mismatch (x64 required).",
+                    ex);
+            }
         }
 
         public ProtectedCallResult InvokeProtected(LuauState state, LuauFunction function, ReadOnlySpan<LuauValue> args)
         {
+            return InvokeProtectedWithResults(state, function, args).Call;
+        }
+
+        public ProtectedInvokeResult InvokeProtectedWithResults(LuauState state, LuauFunction function, ReadOnlySpan<LuauValue> args)
+        {
             if (state == null || function == null)
             {
-                return new ProtectedCallResult
+                return new ProtectedInvokeResult
                 {
-                    Success = false,
-                    Reason = LuauDisableReason.Internal,
-                    ErrorMessage = "state or function was null",
-                    RecoveredViaProtectedCall = false,
+                    Call = new ProtectedCallResult
+                    {
+                        Success = false,
+                        Reason = LuauDisableReason.Internal,
+                        ErrorMessage = "state or function was null",
+                        RecoveredViaProtectedCall = false,
+                    },
+                    ReturnValues = null,
                 };
             }
 
+            long budgetNs = GetValidatedBudgetNs();
             lua_State* L = state.AsPointer();
-            long budgetNs = (long)(ExecutionBudget.TotalMilliseconds * 1_000_000.0);
             BasisLuauNative.basis_luau_begin_execution(L, budgetNs);
 
             try
             {
                 LuauValue[] results = function.InvokeAsync(args.ToArray()).AsTask().GetAwaiter().GetResult();
                 BasisLuauNative.basis_luau_end_execution(L);
-                return new ProtectedCallResult
+                return new ProtectedInvokeResult
                 {
-                    Success = true,
-                    Reason = LuauDisableReason.None,
-                    RecoveredViaProtectedCall = true,
+                    Call = new ProtectedCallResult
+                    {
+                        Success = true,
+                        Reason = LuauDisableReason.None,
+                        RecoveredViaProtectedCall = true,
+                    },
+                    ReturnValues = results,
                 };
             }
             catch (Exception ex)
             {
                 BasisLuauNative.basis_luau_end_execution(L);
                 LuauDisableReason reason = MapReason(BasisLuauNative.basis_luau_last_disable_reason(L), ex);
-                return new ProtectedCallResult
+                return new ProtectedInvokeResult
                 {
-                    Success = false,
-                    Reason = reason,
-                    ErrorMessage = ex.Message,
-                    RecoveredViaProtectedCall = true,
+                    Call = new ProtectedCallResult
+                    {
+                        Success = false,
+                        Reason = reason,
+                        ErrorMessage = ex.Message,
+                        RecoveredViaProtectedCall = true,
+                    },
+                    ReturnValues = null,
                 };
             }
         }
@@ -115,8 +160,8 @@ namespace Luau.Unity
                 };
             }
 
+            long budgetNs = GetValidatedBudgetNs();
             lua_State* L = state.AsPointer();
-            long budgetNs = (long)(ExecutionBudget.TotalMilliseconds * 1_000_000.0);
             BasisLuauNative.basis_luau_begin_execution(L, budgetNs);
 
             try
@@ -158,6 +203,36 @@ namespace Luau.Unity
         {
         }
 
+        long GetValidatedBudgetNs()
+        {
+            if (ExecutionBudget <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(ExecutionBudget), "ExecutionBudget must be positive.");
+            }
+
+            double budgetMs = ExecutionBudget.TotalMilliseconds;
+            if (double.IsNaN(budgetMs) || double.IsInfinity(budgetMs))
+            {
+                throw new ArgumentOutOfRangeException(nameof(ExecutionBudget), "ExecutionBudget is not finite.");
+            }
+
+            long budgetNs = (long)(budgetMs * 1_000_000.0);
+            if (budgetNs <= 0 || budgetNs > MaxBudgetNs)
+            {
+                throw new ArgumentOutOfRangeException(nameof(ExecutionBudget), "ExecutionBudget is out of supported range.");
+            }
+
+            return budgetNs;
+        }
+
+        static InvalidOperationException CreateInitException(basis_luau_init_error error) => error switch
+        {
+            basis_luau_init_error.InvalidConfig => new InvalidOperationException("basis_luau_newstate_with_limits: invalid config."),
+            basis_luau_init_error.CtxAllocFailed => new InvalidOperationException("basis_luau_newstate_with_limits: context allocation failed."),
+            basis_luau_init_error.VmAllocFailed => new InvalidOperationException("basis_luau_newstate_with_limits: VM allocation failed."),
+            _ => new InvalidOperationException("basis_luau_newstate_with_limits failed. Rebuild Native~/build-libluau.ps1 for this platform."),
+        };
+
         static LuauDisableReason MapReason(BasisLuauDisableReason native, Exception ex)
         {
             if (native == BasisLuauDisableReason.Timeout || ex.Message.Contains("execution time limit exceeded", StringComparison.Ordinal))
@@ -185,6 +260,14 @@ namespace Luau.Unity
         public ulong memory_cap_bytes;
     }
 
+    internal enum basis_luau_init_error
+    {
+        None = 0,
+        InvalidConfig = 1,
+        CtxAllocFailed = 2,
+        VmAllocFailed = 3,
+    }
+
     internal enum BasisLuauDisableReason
     {
         None = 0,
@@ -203,7 +286,7 @@ namespace Luau.Unity
 #endif
 
         [DllImport(DllName, EntryPoint = "basis_luau_newstate_with_limits", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern lua_State* basis_luau_newstate_with_limits(ref BasisLuauLimitsConfig config);
+        public static extern lua_State* basis_luau_newstate_with_limits(ref BasisLuauLimitsConfig config, basis_luau_init_error* out_error);
 
         [DllImport(DllName, EntryPoint = "basis_luau_set_execution_deadline", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void basis_luau_set_execution_deadline(lua_State* L, long deadline_ns_monotonic);
