@@ -27,6 +27,7 @@
     { "key": "sdk.avatar.lod.reimport.progress", "value": "{0}/{1}：{2}" },
 
     { "key": "sdk.prop.documentation.button", "value": "開啟 Prop 文件" },
+    { "key": "sdk.prop.testInEditor.confirm.body", "value": "This feature requires the Editor to be in Play Mode. Proceed in entering Play Mode and running Test In Editor for this prop? Ensure that a floor is placed in the scene." },
     { "key": "sdk.prop.buildError.title", "value": "Prop 建置錯誤" },
     { "key": "sdk.prop.buildError.body", "value": "請解決以下問題，或參閱文件。\n {0}" },
 

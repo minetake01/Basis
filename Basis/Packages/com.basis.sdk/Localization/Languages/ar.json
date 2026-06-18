@@ -27,6 +27,7 @@
     { "key": "sdk.avatar.lod.reimport.progress", "value": "{0}/{1}: {2}" },
 
     { "key": "sdk.prop.documentation.button", "value": "فتح توثيق Prop" },
+    { "key": "sdk.prop.testInEditor.confirm.body", "value": "This feature requires the Editor to be in Play Mode. Proceed in entering Play Mode and running Test In Editor for this prop? Ensure that a floor is placed in the scene." },
     { "key": "sdk.prop.buildError.title", "value": "خطأ في بناء Prop" },
     { "key": "sdk.prop.buildError.body", "value": "يرجى حل المشكلات التالية، أو الرجوع إلى التوثيق. \n {0}" },
 

@@ -27,6 +27,7 @@
     { "key": "sdk.avatar.lod.reimport.progress", "value": "{0}/{1}: {2}" },
 
     { "key": "sdk.prop.documentation.button", "value": "プロップのドキュメントを開く" },
+    { "key": "sdk.prop.testInEditor.confirm.body", "value": "この機能はエディターがプレイモードである必要があります。プレイモードに入ってこのプロップの「エディターでテスト」を実行しますか？シーンに床が配置されていることを確認してください。" },
     { "key": "sdk.prop.buildError.title", "value": "プロップのビルドエラー" },
     { "key": "sdk.prop.buildError.body", "value": "次の問題を解決するか、ドキュメントを参照してください。\n {0}" },
 

@@ -16,17 +16,27 @@ public static class TemporaryStorageHandler
     }
     public static string SaveScene(Scene sceneToCopy, BasisAssetBundleObject settings, out string uniqueID)
     {
-        // Generate a unique ID
         uniqueID = BasisGenerateUniqueID.GenerateUniqueID();
+        EnsureDirectoryExists(settings.TemporaryStorage);
+        string scenePath = Path.Combine(settings.TemporaryStorage, $"{uniqueID}.unity");
+        return SaveSceneToTemporaryStorage(sceneToCopy, scenePath, ref uniqueID);
+    }
 
-        // Attempt to save the scene
-        if (EditorSceneManager.SaveScene(sceneToCopy))
+    public static string SaveSceneToTemporaryStorage(Scene scene, string scenePath, ref string uniqueID)
+    {
+        if (string.IsNullOrEmpty(scenePath))
         {
-            // Return the path it was saved to
-            return sceneToCopy.path;
+            uniqueID = null;
+            return null;
         }
 
-        // If save fails, clear the ID and return null
+        EnsureDirectoryExists(Path.GetDirectoryName(scenePath));
+        if (EditorSceneManager.SaveScene(scene, scenePath))
+        {
+            uniqueID = Path.GetFileNameWithoutExtension(scenePath);
+            return scenePath;
+        }
+
         uniqueID = null;
         return null;
     }

@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using Basis.Editor.Localization;
+using Basis.Scripts.BasisSdk;
 using Basis.Scripts.BasisSdk.Helpers.Editor;
+using Basis.Scripts.BasisSdk.Players;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -10,6 +13,12 @@ using static BasisAvatarValidator;
 [CustomEditor(typeof(BasisProp))]
 public class BasisPropSDKInspector : Editor
 {
+    private const string PendingTestInEditorPropIdSessionKey = "BasisPropSDKInspector.PendingTestInEditorPropId";
+
+    public delegate void BeforeTestInEditorHandler(GameObject clone);
+    public static BeforeTestInEditorHandler OnBeforeTestInEditor;
+    private static BasisProp ScheduledTestInEditorProp;
+
     public VisualTreeAsset visualTree;
     public BasisProp BasisProp;
     public VisualElement rootElement;
@@ -17,6 +26,71 @@ public class BasisPropSDKInspector : Editor
     private Label resultLabel;
     public BasisAssetBundleObject assetBundleObject;
     public BasisPropValidator BasisPropValidator;
+
+    [InitializeOnLoadMethod]
+    private static void InitializeTestInEditorHooks()
+    {
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+        EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+    }
+
+    private static void OnPlayModeStateChanged(PlayModeStateChange state)
+    {
+        if (state != PlayModeStateChange.EnteredPlayMode || !HasPendingTestInEditorPropId())
+        {
+            return;
+        }
+
+        EditorApplication.delayCall -= TryExecutePendingTestInEditor;
+        EditorApplication.delayCall += TryExecutePendingTestInEditor;
+    }
+
+    private static void TryExecutePendingTestInEditor()
+    {
+        string pendingPropId = GetPendingTestInEditorPropId();
+        if (string.IsNullOrEmpty(pendingPropId))
+        {
+            return;
+        }
+
+        if (!GlobalObjectId.TryParse(pendingPropId, out GlobalObjectId globalObjectId))
+        {
+            ClearPendingTestInEditorPropId();
+            return;
+        }
+
+        ClearPendingTestInEditorPropId();
+        UnityEngine.Object resolved = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(globalObjectId);
+        if (resolved is not BasisProp prop)
+        {
+            BasisDebug.LogError("Unable to resolve the pending prop for Test In Editor.", BasisDebug.LogTag.Editor);
+            return;
+        }
+
+        RequestPropLoad(prop);
+    }
+
+    private static bool HasPendingTestInEditorPropId()
+    {
+        return SessionState.GetBool(PendingTestInEditorPropIdSessionKey + ".Exists", false);
+    }
+
+    private static string GetPendingTestInEditorPropId()
+    {
+        return SessionState.GetString(PendingTestInEditorPropIdSessionKey, string.Empty);
+    }
+
+    private static void SetPendingTestInEditorPropId(string propId)
+    {
+        SessionState.SetString(PendingTestInEditorPropIdSessionKey, propId ?? string.Empty);
+        SessionState.SetBool(PendingTestInEditorPropIdSessionKey + ".Exists", !string.IsNullOrEmpty(propId));
+    }
+
+    private static void ClearPendingTestInEditorPropId()
+    {
+        SessionState.EraseString(PendingTestInEditorPropIdSessionKey);
+        SessionState.SetBool(PendingTestInEditorPropIdSessionKey + ".Exists", false);
+    }
 
     public void OnEnable()
     {
@@ -44,7 +118,6 @@ public class BasisPropSDKInspector : Editor
 
             BasisPropValidator = new BasisPropValidator(BasisProp, rootElement);
 
-            // Documentation button
             Button docButton = DocumentationButton(rootElement, BasisEditorLocalization.Get("sdk.prop.documentation.button"));
             docButton.clicked += delegate
             {
@@ -59,7 +132,6 @@ public class BasisPropSDKInspector : Editor
             };
             rootElement.Add(docButton);
 
-            // Name and description fields
             TextField PropNameField = uiElementsRoot.Q<TextField>(BasisSDKConstants.PropName);
             TextField PropDescriptionField = uiElementsRoot.Q<TextField>(BasisSDKConstants.PropDescription);
 
@@ -69,14 +141,12 @@ public class BasisPropSDKInspector : Editor
             PropNameField.RegisterCallback<ChangeEvent<string>>(PropNameChanged);
             PropDescriptionField.RegisterCallback<ChangeEvent<string>>(PropDescriptionChanged);
 
-            // Icon field
             ObjectField PropIconField = uiElementsRoot.Q<ObjectField>(BasisSDKConstants.PropIcon);
             PropIconField.objectType = typeof(Texture2D);
             PropIconField.allowSceneObjects = true;
             PropIconField.value = BasisProp.BasisBundleDescription.AssetBundleIcon;
             PropIconField.RegisterCallback<ChangeEvent<UnityEngine.Object>>(OnIconFieldChanged);
 
-            // Content tags + build options
             BasisSDKCommonInspector.CreateContentTagsFoldout(uiElementsRoot, BasisProp);
             BasisSDKCommonInspector.CreateBuildTargetOptions(uiElementsRoot);
             BasisSDKCommonInspector.CreateBuildOptionsDropdown(uiElementsRoot);
@@ -84,6 +154,9 @@ public class BasisPropSDKInspector : Editor
             BasisAssetBundleObject assetBundleObject = AssetDatabase.LoadAssetAtPath<BasisAssetBundleObject>(BasisAssetBundleObject.AssetBundleObject);
             Button BuildButton = BasisHelpersGizmo.Button(uiElementsRoot, BasisSDKConstants.BuildButton);
             BuildButton.clicked += () => Build(BuildButton, assetBundleObject.selectedTargets, BasisProp.BasisBundleDescription.AssetBundleIcon);
+
+            Button PropTestInEditorClick = BasisHelpersGizmo.Button(uiElementsRoot, BasisSDKConstants.PropTestInEditor);
+            PropTestInEditorClick.clicked += PropTestInEditorClickFunction;
         }
         else
         {
@@ -91,6 +164,103 @@ public class BasisPropSDKInspector : Editor
         }
 
         return rootElement;
+    }
+
+    public void PropTestInEditorClickFunction()
+    {
+#if BASIS_FRAMEWORK_EXISTS
+        if (!Application.isPlaying)
+        {
+            bool result = EditorUtility.DisplayDialog(
+                BasisEditorLocalization.Get("sdk.common.dialog.confirm"),
+                BasisEditorLocalization.Get("sdk.prop.testInEditor.confirm.body"),
+                BasisEditorLocalization.Get("sdk.common.dialog.yes"),
+                BasisEditorLocalization.Get("sdk.common.dialog.no"));
+            if (result)
+            {
+                SetPendingTestInEditorPropId(GlobalObjectId.GetGlobalObjectIdSlow(BasisProp).ToString());
+                EditorApplication.EnterPlaymode();
+            }
+        }
+        else
+        {
+            RequestPropLoad();
+        }
+#else
+        RequestPropLoad();
+#endif
+    }
+
+    public void RequestPropLoad()
+    {
+        RequestPropLoad(BasisProp);
+    }
+
+    private static void RequestPropLoad(BasisProp prop)
+    {
+#if BASIS_FRAMEWORK_EXISTS
+        if (BasisLocalPlayerData.PlayerReady)
+        {
+            LoadProp(prop);
+        }
+        else
+        {
+            ScheduledTestInEditorProp = prop;
+            BasisLocalPlayerData.OnLocalPlayerInitialized -= LoadScheduledProp;
+            BasisLocalPlayerData.OnLocalPlayerInitialized += LoadScheduledProp;
+        }
+#else
+        LoadProp(prop);
+#endif
+    }
+
+    private static void LoadScheduledProp()
+    {
+#if BASIS_FRAMEWORK_EXISTS
+        BasisLocalPlayerData.OnLocalPlayerInitialized -= LoadScheduledProp;
+        if (ScheduledTestInEditorProp == null)
+        {
+            return;
+        }
+
+        BasisProp prop = ScheduledTestInEditorProp;
+        ScheduledTestInEditorProp = null;
+        LoadProp(prop);
+#endif
+    }
+
+    private static void LoadProp(BasisProp prop)
+    {
+        GameObject clone = UnityEngine.Object.Instantiate(prop.gameObject);
+        clone.name = prop.gameObject.name;
+        BasisAssetBundlePipeline.DestroyEditorOnlyInAvatar(clone);
+        OnBeforeTestInEditor?.Invoke(clone);
+
+        Vector3 position = ResolveSpawnPosition(out Quaternion rotation);
+        clone.transform.SetPositionAndRotation(position, rotation);
+        clone.transform.SetParent(null, true);
+    }
+
+    private static Vector3 ResolveSpawnPosition(out Quaternion rotation)
+    {
+        Transform reference = null;
+        if (Application.isPlaying && Camera.main != null)
+        {
+            reference = Camera.main.transform;
+        }
+        else if (SceneView.lastActiveSceneView != null && SceneView.lastActiveSceneView.camera != null)
+        {
+            reference = SceneView.lastActiveSceneView.camera.transform;
+        }
+
+        if (reference != null)
+        {
+            rotation = Quaternion.Euler(0f, reference.eulerAngles.y, 0f);
+            return reference.position + reference.forward * 2f;
+        }
+
+        rotation = Quaternion.identity;
+        return Vector3.zero;
     }
 
     private void OnIconFieldChanged(ChangeEvent<UnityEngine.Object> evt)

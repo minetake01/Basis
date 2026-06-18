@@ -47,6 +47,7 @@ public class BasisSDKConstants
     public static readonly string PropName = "propnameinput";
     public static readonly string PropDescription = "propdescriptioninput";
     public static readonly string PropDocumentationURL = "https://docs.basisvr.org/en/docs/prop";
+    public static readonly string PropTestInEditor = "TestInEditor";
     #endregion
 
     #region Scene

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Basis.Editor.Localization;
 using Basis.Scripts.BasisSdk;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
@@ -78,8 +79,27 @@ public static class BasisAssetBundlePipeline
                     }
                 }
 
-                OnBeforeBuildScene?.Invoke(scene, settings);
-                assetPath = TemporaryStorageHandler.SaveScene(scene, settings, out uniqueID);
+                SceneSetup[] sceneSetup = EditorSceneManager.GetSceneManagerSetup();
+                uniqueID = BasisGenerateUniqueID.GenerateUniqueID();
+                TemporaryStorageHandler.EnsureDirectoryExists(settings.TemporaryStorage);
+                string tempScenePath = Path.Combine(settings.TemporaryStorage, $"{uniqueID}.unity");
+
+                try
+                {
+                    if (!EditorSceneManager.SaveScene(scene, tempScenePath, true))
+                    {
+                        throw new InvalidOperationException($"Failed to save temporary scene copy for '{scene.name}'.");
+                    }
+
+                    Scene tempScene = EditorSceneManager.OpenScene(tempScenePath, OpenSceneMode.Additive);
+                    OnBeforeBuildScene?.Invoke(tempScene, settings);
+                    assetPath = TemporaryStorageHandler.SaveSceneToTemporaryStorage(tempScene, tempScenePath, ref uniqueID);
+                    EditorSceneManager.CloseScene(tempScene, true);
+                }
+                finally
+                {
+                    EditorSceneManager.RestoreSceneManagerSetup(sceneSetup);
+                }
             }
             else
             {
