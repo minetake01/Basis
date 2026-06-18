@@ -20,6 +20,24 @@ namespace Minetake.Basis.Luau.Services
             state.OpenLibrary<BasisLuauInstantiateService>();
         }
 
+        [LuauMember("destroy")]
+        public static void Destroy(double handleRaw)
+        {
+            var host = LuauBindingContext.Host;
+            if (host == null)
+            {
+                return;
+            }
+
+            var handle = Registry.LuauObjectHandle.FromRaw((ulong)handleRaw);
+            if (!host.Registry.TryResolve(handle, out UnityEngine.Object obj) || obj == null)
+            {
+                return;
+            }
+
+            UnityEngine.Object.Destroy(obj);
+        }
+
         [LuauMember("clone")]
         public static double Clone(double handleRaw)
         {

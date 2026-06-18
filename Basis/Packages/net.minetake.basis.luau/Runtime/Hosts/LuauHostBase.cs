@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Luau;
 using Luau.Unity;
 using Minetake.Basis.Luau.Bindings;
+using Minetake.Basis.Luau.Policy;
 using Minetake.Basis.Luau.Registry;
 using UnityEngine;
 
@@ -15,6 +16,7 @@ namespace Minetake.Basis.Luau
         protected abstract LuauHostKind DefaultHostKind { get; }
 
         readonly LuauObjectRegistry _registry = new();
+        readonly LuauCallbackRegistry _callbacks = new();
         readonly List<LuauScriptProxy> _proxies = new();
 
         LuauExecutionLimits _limits;
@@ -23,13 +25,16 @@ namespace Minetake.Basis.Luau
 
         public LuauHostKind HostKind => hostKind;
         public LuauObjectRegistry Registry => _registry;
+        public LuauCallbackRegistry Callbacks => _callbacks;
         public LuauCapability Capability { get; private set; }
+        public LuauWhitelistPolicy Policy { get; private set; }
         public bool HasLiveState => _rootState != null && !_stateDestroyed;
 
         protected virtual void Awake()
         {
             hostKind = DefaultHostKind;
-            Capability = new LuauCapability(hostKind, transform);
+            Policy = LuauWhitelistPolicy.ForHost(hostKind);
+            Capability = new LuauCapability(hostKind, transform, Policy);
             InitializeStateIfNeeded();
         }
 
@@ -56,6 +61,7 @@ namespace Minetake.Basis.Luau
             if (proxy != null)
             {
                 _proxies.Remove(proxy);
+                _callbacks.ClearProxy(proxy);
             }
         }
 
@@ -66,6 +72,7 @@ namespace Minetake.Basis.Luau
                 return;
             }
 
+            Policy ??= LuauWhitelistPolicy.ForHost(hostKind);
             _limits = new LuauExecutionLimits();
             _rootState = _limits.CreateLimitedState();
             RegisterStandardLibraries(_rootState);
@@ -81,6 +88,8 @@ namespace Minetake.Basis.Luau
         protected virtual void RegisterHostBindings(LuauState state)
         {
             state.OpenLibrary<TransformBindings>();
+            state.OpenLibrary<TimeBindings>();
+            ObjectBindings.Install(state);
             RegisterServiceBindings(state);
         }
 
@@ -120,7 +129,23 @@ namespace Minetake.Basis.Luau
                 return new ProtectedCallResult { Success = true, Reason = LuauDisableReason.None, RecoveredViaProtectedCall = true };
             }
 
+            return InvokeProtected(proxy, function, args);
+        }
+
+        internal ProtectedCallResult InvokeCallback(LuauScriptProxy proxy, LuauFunction function, params LuauValue[] args)
+        {
+            if (_stateDestroyed || proxy == null || !proxy.IsEnabled || function == null)
+            {
+                return default;
+            }
+
+            return InvokeProtected(proxy, function, args);
+        }
+
+        ProtectedCallResult InvokeProtected(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args)
+        {
             LuauBindingContext.Host = this;
+            LuauBindingContext.Proxy = proxy;
             try
             {
                 ProtectedCallResult result = _limits.InvokeProtected(_rootState, function, args);

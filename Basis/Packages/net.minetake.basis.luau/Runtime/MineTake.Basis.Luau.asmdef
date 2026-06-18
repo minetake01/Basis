@@ -10,7 +10,12 @@
         "BasisDebug",
         "BasisSDK",
         "Basis Framework",
-        "HVR.Basis.Comms"
+        "HVR.Basis.Comms",
+        "Unity.TextMeshPro",
+        "Unity.ugui",
+        "Unity.PhysicsModule",
+        "Unity.AIModule",
+        "Unity.VideoModule"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

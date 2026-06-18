@@ -1,4 +1,3 @@
-using Basis.Scripts.BasisSdk;
 using Luau;
 using Minetake.Basis.Luau.Bindings;
 using UnityEngine;
@@ -40,19 +39,64 @@ namespace Minetake.Basis.Luau.Services
 
             return host.RegisterObject(bridge).ToRaw();
         }
-    }
 
-    public sealed class BasisLuauAvatarBridge : MonoBehaviour
-    {
-        BasisAvatar _avatar;
-
-        public bool IsReady => _avatar != null && _avatar.IsReady;
-        public bool IsOwnedLocally => _avatar != null && _avatar.IsOwnedLocally;
-        public Animator Animator => _avatar != null ? _avatar.Animator : null;
-
-        void Awake()
+        [LuauMember("isReady")]
+        public static bool IsReady(double handleRaw)
         {
-            _avatar = GetComponent<BasisAvatar>() ?? GetComponentInParent<BasisAvatar>(true);
+            return TryGetBridge(handleRaw, out var bridge) && bridge.IsReady;
+        }
+
+        [LuauMember("isLocalPlayer")]
+        public static bool IsLocalPlayer(double handleRaw) =>
+            TryGetBridge(handleRaw, out var bridge) && bridge.IsLocalPlayer;
+
+        [LuauMember("setHumanScale")]
+        public static void SetHumanScale(double handleRaw, double scale)
+        {
+            if (TryGetBridge(handleRaw, out var bridge))
+            {
+                bridge.HumanScale = (float)scale;
+            }
+        }
+
+        [LuauMember("onReady")]
+        public static void OnReady(double handleRaw, LuauFunction callback)
+        {
+            if (!TryGetBridge(handleRaw, out var bridge) || callback == null)
+            {
+                return;
+            }
+
+            var host = LuauBindingContext.Host;
+            var proxy = LuauBindingContext.Proxy;
+            if (host == null || proxy == null)
+            {
+                return;
+            }
+
+            bridge.OnAvatarReady = isOwner =>
+            {
+                host.InvokeCallback(proxy, callback, isOwner);
+            };
+        }
+
+        static bool TryGetBridge(double handleRaw, out BasisLuauAvatarBridge bridge)
+        {
+            bridge = null;
+            var host = LuauBindingContext.Host;
+            if (host == null)
+            {
+                return false;
+            }
+
+            var handle = Registry.LuauObjectHandle.FromRaw((ulong)handleRaw);
+            if (!host.Registry.TryResolve(handle, out UnityEngine.Object obj))
+            {
+                return false;
+            }
+
+            bridge = obj as BasisLuauAvatarBridge;
+            return bridge != null;
         }
     }
 }

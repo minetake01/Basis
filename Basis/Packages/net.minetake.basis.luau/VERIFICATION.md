@@ -1,4 +1,4 @@
-# Manual verification checklist (Phase 0A–6)
+# Manual verification checklist (Phase 0A–7)
 
 ## Editor
 
@@ -7,6 +7,8 @@
 - [ ] Attach `BasisLuauBehaviour` + `LuauPropHost`, export prop → `LuauScriptProxy` remains, behaviour removed
 - [ ] Export without host → build **throws** (fail-fast)
 - [ ] ObjectRotator demo rotates target transform via handle
+- [ ] TmpLabel updates TMP text via `basis_object.setField`
+- [ ] Handle slots resolve after export (serialized `slotObjects` → runtime handles)
 
 ## Native limits (requires `basis_luau_limits` built per platform)
 
@@ -23,6 +25,18 @@
 - [ ] iOS arm64 IL2CPP (static libs linked)
 - [ ] WebGL build surfaces `#error` from `PlatformGuard.cs`
 
+## Whitelist / bindings
+
+- [ ] `Minetake.Basis.Luau.Tests` policy tests pass (TMPro, UI, Physics, NavMesh, blocked APIs)
+- [ ] Prop: AudioSource play via `basis_object.call`
+- [ ] Scene: `Physics.Raycast` via `basis_object.callStatic`
+- [ ] Scene: `NavMesh.SamplePosition` via `basis_object.callStatic`
+- [ ] Avatar: `basis_avatar.resolveAvatar` + face parameter fields
+- [ ] OSC subscribe/publish (`OscNetworkEcho.luau`)
+- [ ] Network `basis_network.onMessage` + `sendBytes`
+- [ ] ContentPolice-sanitized `basis_instantiate.clone`
+- [ ] `onTriggerEnter` receives collider handle
+
 ## Build native limits
 
 ```powershell
@@ -33,9 +47,7 @@
 ./Packages/net.minetake.luau/Native~/build.sh    # Linux x64
 ```
 
-Other platforms: integrate `basis_luau_limits.c` into platform CI (same pattern as luau-dotnet native build).
-
 ## Tests
 
-- [ ] `Minetake.Basis.Luau.Tests` (handle registry)
+- [ ] `Minetake.Basis.Luau.Tests` (handle registry + whitelist policy)
 - [ ] `HVR.Basis.Comms.Tests` OscBridgeTests (BasisLuauOscHost)
