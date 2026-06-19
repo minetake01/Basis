@@ -7,7 +7,7 @@
     "name": "minetake",
     "url": "https://github.com/minetake01"
   },
-  "license": "MIT",
+  "license": "CC0-1.0",
   "url": "https://basis.minetake.net/",
   "documentationUrl": "https://github.com/minetake01/basis-vpm/tree/main/Packages/net.minetake.basis.transparent-mirror",
   "dependencies": {
