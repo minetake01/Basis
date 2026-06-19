@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 9100000000000000011}
   - component: {fileID: 9100000000000000021}
+  - component: {fileID: 9100000000000000041}
   - component: {fileID: 9100000000000000031}
   m_Layer: 0
   m_Name: TransparentMirror
@@ -31,7 +32,8 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 9100000000000000111}
+  - {fileID: 9100000000000000311}
+  - {fileID: 9100000000000000411}
   - {fileID: 9100000000000000211}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -64,12 +66,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c155a99d43254dffb98da3ba1ad7ca30, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Mirror: {fileID: 9100000000000000141}
-  ModeButton: {fileID: 9100000000000000241}
+  ButtonObject: {fileID: 9100000000000000201}
+  MirrorFull: {fileID: 9100000000000000301}
+  MirrorTransparent: {fileID: 9100000000000000401}
+  ButtonRenderer: {fileID: 9100000000000000231}
   OffColor: {r: 0.45, g: 0.45, b: 0.45, a: 1}
   FullColor: {r: 0.2, g: 0.45, b: 0.95, a: 1}
   TransparentColor: {r: 0.2, g: 0.85, b: 0.35, a: 1}
---- !u!1 &9100000000000000101
+  ColorPropertyName: _BaseColor
+--- !u!114 &9100000000000000041
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad0be8d14210ca945bf03d4e12a72861, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  assemblyData: 
+  showFunctionProfiling: 0
+  exportDebuggingData: 0
+  verboseLogging: 0
+  disabledReason: 
+  disabled: 0
+  desiredTimeoutLengthUs: 500000
+--- !u!1 &9100000000000000301
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -77,24 +101,24 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 9100000000000000111}
-  - component: {fileID: 9100000000000000121}
-  - component: {fileID: 9100000000000000131}
-  - component: {fileID: 9100000000000000141}
+  - component: {fileID: 9100000000000000311}
+  - component: {fileID: 9100000000000000321}
+  - component: {fileID: 9100000000000000331}
+  - component: {fileID: 9100000000000000341}
   m_Layer: 0
-  m_Name: MirrorPlane
+  m_Name: MirrorFull
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &9100000000000000111
+  m_IsActive: 0
+--- !u!4 &9100000000000000311
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9100000000000000101}
+  m_GameObject: {fileID: 9100000000000000301}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 1.2, z: 0}
@@ -103,22 +127,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 9100000000000000011}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &9100000000000000121
+--- !u!33 &9100000000000000321
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9100000000000000101}
+  m_GameObject: {fileID: 9100000000000000301}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &9100000000000000131
+--- !u!23 &9100000000000000331
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9100000000000000101}
-  m_Enabled: 0
+  m_GameObject: {fileID: 9100000000000000301}
+  m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -160,25 +184,153 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &9100000000000000141
+--- !u!114 &9100000000000000341
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9100000000000000101}
+  m_GameObject: {fileID: 9100000000000000301}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 19ebbe3d2e2a41d18f3cf590a7c1256f, type: 3}
+  m_Script: {fileID: 11500000, guid: 0647cb0d51f50ec4fb370f7326093528, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  MirrorRenderer: {fileID: 9100000000000000131}
-  OpaqueMaterial: {fileID: 2100000, guid: 90b54af568b542359461be4a1ba9a332, type: 2}
-  TransparentMaterial: {fileID: 2100000, guid: f34e218a1b5942c7a6a0a667acc05887, type: 2}
-  fullReflectingLayers:
+  Renderer: {fileID: 9100000000000000331}
+  MirrorsMaterial: {fileID: 2100000, guid: 90b54af568b542359461be4a1ba9a332, type: 2}
+  ReflectingLayers:
     serializedVersion: 2
     m_Bits: 477
-  clipPlaneOffset: 0.001
+  clearFlags: 0
+  clearColor: {r: 0, g: 0, b: 0, a: 1}
+  ClipPlaneOffset: 0.001
+  nearClipLimit: 0.01
+  FarClipPlane: 25
+  XSize: 2048
+  YSize: 2048
+  depth: 24
+  Antialiasing: 2
+  allowXRRendering: 1
+  RenderPostProcessing: 0
+  OcclusionCulling: 0
+  renderShadows: 0
+  IsActive: 0
+  IsAbleToRender: 0
+  LeftCamera: {fileID: 0}
+  RightCamera: {fileID: 0}
+  PortalTextureLeft: {fileID: 0}
+  PortalTextureRight: {fileID: 0}
+--- !u!1 &9100000000000000401
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9100000000000000411}
+  - component: {fileID: 9100000000000000421}
+  - component: {fileID: 9100000000000000431}
+  - component: {fileID: 9100000000000000441}
+  m_Layer: 0
+  m_Name: MirrorTransparent
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &9100000000000000411
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000401}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.2, z: 0}
+  m_LocalScale: {x: 2, y: 2.4, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9100000000000000011}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &9100000000000000421
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000401}
+  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!23 &9100000000000000431
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000401}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: f34e218a1b5942c7a6a0a667acc05887, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &9100000000000000441
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9100000000000000401}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0647cb0d51f50ec4fb370f7326093528, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Renderer: {fileID: 9100000000000000431}
+  MirrorsMaterial: {fileID: 2100000, guid: f34e218a1b5942c7a6a0a667acc05887, type: 2}
+  ReflectingLayers:
+    serializedVersion: 2
+    m_Bits: 192
+  clearFlags: 2
+  clearColor: {r: 0, g: 0, b: 0, a: 0}
+  ClipPlaneOffset: 0.001
   nearClipLimit: 0.01
   FarClipPlane: 25
   XSize: 2048
@@ -317,7 +469,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 9100000000000000201}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 204ebd644bb74673be65e450ed17ba0c, type: 3}
+  m_Script: {fileID: 11500000, guid: b69dc8bbb99013e41a6620d36e35fa7a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _colliderRefs: []
@@ -350,5 +502,5 @@ MonoBehaviour:
   HoverColor: {r: 0.65, g: 0.65, b: 0.65, a: 1}
   InteractColor: {r: 1, g: 1, b: 1, a: 1}
   DisabledColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
-  ColliderRef: {fileID: 0}
-  RendererRef: {fileID: 0}
+  ColliderRef: {fileID: 9100000000000000251}
+  RendererRef: {fileID: 9100000000000000231}

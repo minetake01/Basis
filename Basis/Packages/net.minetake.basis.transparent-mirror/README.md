@@ -2,6 +2,8 @@
 
 VRChat-style world mirror prop for Basis.
 
+Props are user-generated content: custom logic must run through **Cilbox** (`[Cilboxable]` + `CilboxPropBasis`), while mirror rendering uses the approved native `BasisSDKMirror` component.
+
 ## Modes (local per player)
 
 Press the mode button to cycle:
@@ -12,12 +14,6 @@ Press the mode button to cycle:
 
 ## Usage
 
-### Place in a world scene
-
-1. Drag `Prefabs/TransparentMirror` into your world scene.
-2. Orient the mirror plane so **+Z** points out of the reflective surface.
-3. Build the scene with `BasisScene`.
-
 ### Spawn from library
 
 Requires Addressables entries (same pattern as `net.minetake.basis.mediastream`):
@@ -25,10 +21,20 @@ Requires Addressables entries (same pattern as `net.minetake.basis.mediastream`)
 - `Transparent Mirror` → prefab
 - `TransparentMirrorEmbeddedItemsCatalog` → embedded items catalog asset
 
+Build the prop bundle from the prefab so Cilbox can compile `[Cilboxable]` scripts into `CilboxProxy` before shipping.
+
+The embedded catalog entry is **library-only** (`IsPinned: false`): it appears in the Props library but does not add an Esc menu shortcut. Placement uses raycast mode so scale can be adjusted like a normal prop.
+
+### Place in a world scene
+
+1. Drag `Prefabs/TransparentMirror` into your world scene.
+2. Orient the mirror plane so **+Z** points out of the reflective surface.
+3. Build the scene with `BasisScene`.
+
 ## Package layout
 
-- `Integration/` — mirror runtime, mode controller, interactable button, embedded-items bootstrap
+- `Integration/` — cilbox mode controller, embedded-items bootstrap
 - `Shader/` — `TransparentMirror.shader`
 - `Materials/` — opaque and transparent mirror materials
-- `Prefabs/` — `TransparentMirror.prefab`
+- `Prefabs/` — `TransparentMirror.prefab` (`BasisSDKMirror` + `CilboxPropBasis`)
 - `Settings/` — embedded items catalog

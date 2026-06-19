@@ -15,14 +15,14 @@ MonoBehaviour:
   Entries:
   - Key:
       Mode: 2
-      PlacementType: 1
+      PlacementType: 0
       Url: Transparent Mirror
-      Pass:
+      Pass: 
       EmbeddedSettings:
         IsEmbedded: 1
         SourceType: 1
       PinnedSettings:
-        IsPinned: 1
+        IsPinned: 0
         NetworkType: 0
         IsEphemeral: 1
     HasCustomIconAddress: 1

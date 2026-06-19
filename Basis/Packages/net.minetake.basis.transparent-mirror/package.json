@@ -13,6 +13,9 @@
   },
   "vpmDependencies": {
     "com.basis.framework": "0.0.1",
-    "com.basis.sdk": "0.0.1"
+    "com.basis.sdk": "0.0.1",
+    "com.basis.examples": "0.0.1",
+    "com.basis.shim": "0.0.1",
+    "com.cnlohr.cilbox": "0.1.0"
   }
 }

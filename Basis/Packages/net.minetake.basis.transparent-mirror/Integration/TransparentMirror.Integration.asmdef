@@ -5,6 +5,7 @@
         "Basis Framework",
         "BasisSDK",
         "BasisCommon",
+        "Cilbox",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.Mathematics",

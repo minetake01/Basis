@@ -34,6 +34,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AlphaCutoff: 0.02
     - _DstBlend: 10
     - _ReflectionFactor: 0.872
     - _SrcBlend: 5
