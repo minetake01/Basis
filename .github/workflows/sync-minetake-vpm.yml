@@ -1,0 +1,84 @@
+name: Sync Minetake VPM
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Package development branch (e.g. feat/transparent-mirror)'
+        required: true
+        type: string
+      package:
+        description: 'Package folder name (e.g. net.minetake.basis.transparent-mirror)'
+        required: true
+        type: string
+      commit_message:
+        description: 'Optional commit message on basis-vpm main (default sync: <package> from <branch>)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  HUB_REPO: minetake/basis-vpm
+  PACKAGE_ROOT: Basis/Packages
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_branch }}
+          path: basis-src
+
+      - name: Validate package path
+        run: |
+          set -euo pipefail
+          PKG="${{ inputs.package }}"
+          SRC="basis-src/${PACKAGE_ROOT}/${PKG}"
+          if [ ! -d "$SRC" ]; then
+            echo "::error::Package not found at ${SRC}"
+            exit 1
+          fi
+          if [ ! -f "$SRC/package.json" ]; then
+            echo "::error::package.json missing at ${SRC}"
+            exit 1
+          fi
+
+      - name: Checkout basis-vpm hub
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.HUB_REPO }}
+          token: ${{ secrets.BASIS_VPM_SYNC_TOKEN }}
+          path: basis-vpm
+
+      - name: Sync package
+        run: |
+          set -euo pipefail
+          PKG="${{ inputs.package }}"
+          SRC="basis-src/${PACKAGE_ROOT}/${PKG}"
+          DEST="basis-vpm/Packages/${PKG}"
+          rm -rf "$DEST"
+          mkdir -p "$(dirname "$DEST")"
+          cp -a "$SRC" "$DEST"
+
+      - name: Commit and push
+        env:
+          MSG: ${{ inputs.commit_message }}
+          BRANCH: ${{ inputs.source_branch }}
+          PKG: ${{ inputs.package }}
+        working-directory: basis-vpm
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "Packages/${PKG}"
+          if git diff --staged --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
+          COMMIT_MSG="${MSG:-sync: ${PKG} from ${BRANCH}}"
+          git commit -m "$COMMIT_MSG"
+          git push
