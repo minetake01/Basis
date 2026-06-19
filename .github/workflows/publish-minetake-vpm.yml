@@ -1,0 +1,151 @@
+name: Publish Minetake VPM
+
+# Single maintainer entry point: pick package + branch, bump version in package.json, run.
+# Syncs to basis-vpm and automatically triggers VPM publish there.
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        type: choice
+        options:
+          - net.minetake.basis.transparent-mirror
+      source_branch:
+        description: >-
+          Source branch. "(workflow branch)" uses the branch selected in the
+          Run workflow dropdown above. Pick a named branch to override.
+        required: true
+        type: choice
+        default: '(workflow branch)'
+        options:
+          - '(workflow branch)'
+          - feat/transparent-mirror
+          - developer
+
+permissions:
+  contents: read
+
+env:
+  HUB_REPO: minetake01/basis-vpm
+  PACKAGE_ROOT: Basis/Packages
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve source branch
+        id: branch
+        run: |
+          set -euo pipefail
+          SELECTED="${{ inputs.source_branch }}"
+          if [ "$SELECTED" = "(workflow branch)" ]; then
+            REF="${{ github.ref_name }}"
+          else
+            REF="$SELECTED"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Using source branch: $REF"
+
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.branch.outputs.ref }}
+          path: basis-src
+
+      - name: Validate package is listed
+        run: |
+          set -euo pipefail
+          PKG="${{ inputs.package }}"
+          if ! grep -qxF "$PKG" basis-src/.github/minetake-vpm-packages.txt; then
+            echo "::error::${PKG} is not listed in .github/minetake-vpm-packages.txt"
+            exit 1
+          fi
+
+      - name: Read package version
+        id: meta
+        env:
+          PKG: ${{ inputs.package }}
+        run: |
+          set -euo pipefail
+          PKG_JSON="basis-src/${PACKAGE_ROOT}/${PKG}/package.json"
+          if [ ! -f "$PKG_JSON" ]; then
+            echo "::error::package.json not found at ${PKG_JSON}"
+            exit 1
+          fi
+          VERSION="$(python3 -c "import json; print(json.load(open('${PKG_JSON}'))['version'])")"
+          if [ -z "$VERSION" ]; then
+            echo "::error::version missing in package.json"
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Package ${PKG} @ ${VERSION} (release tag ${TAG})"
+
+      - name: Checkout basis-vpm hub
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.HUB_REPO }}
+          token: ${{ secrets.BASIS_VPM_SYNC_TOKEN }}
+          path: basis-vpm
+
+      - name: Sync package to hub
+        id: sync
+        env:
+          PKG: ${{ inputs.package }}
+          BRANCH: ${{ steps.branch.outputs.ref }}
+        run: |
+          set -euo pipefail
+          SRC="basis-src/${PACKAGE_ROOT}/${PKG}"
+          DEST="basis-vpm/Packages/${PKG}"
+          if [ ! -d "$SRC" ]; then
+            echo "::error::Package not found at ${SRC}"
+            exit 1
+          fi
+          rm -rf "$DEST"
+          mkdir -p "$(dirname "$DEST")"
+          cp -a "$SRC" "$DEST"
+
+          MANIFEST="basis-vpm/.github/vpm-packages.txt"
+          if ! grep -qxF "$PKG" "$MANIFEST"; then
+            echo "$PKG" >> "$MANIFEST"
+            echo "Registered ${PKG} in hub vpm-packages.txt"
+          fi
+
+      - name: Commit and push to hub
+        id: push
+        env:
+          PKG: ${{ inputs.package }}
+          BRANCH: ${{ steps.branch.outputs.ref }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        working-directory: basis-vpm
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "Packages/${PKG}" .github/vpm-packages.txt
+          if git diff --staged --quiet; then
+            echo "No file changes on hub (package content unchanged)."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "sync: ${PKG}@${VERSION} from ${BRANCH}"
+            git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger VPM publish on hub
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.BASIS_VPM_SYNC_TOKEN }}
+          repository: ${{ env.HUB_REPO }}
+          event-type: vpm-publish
+          client-payload: >-
+            {
+              "package": "${{ inputs.package }}",
+              "version": "${{ steps.meta.outputs.version }}",
+              "tag": "${{ steps.meta.outputs.tag }}",
+              "source_branch": "${{ steps.branch.outputs.ref }}",
+              "source_sha": "${{ github.sha }}"
+            }
