@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 env:
-  HUB_REPO: minetake/basis-vpm
+  HUB_REPO: minetake01/basis-vpm
   PACKAGE_ROOT: Basis/Packages
 
 jobs:
