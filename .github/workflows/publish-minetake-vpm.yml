@@ -1,7 +1,7 @@
 name: Publish Minetake VPM
 
-# Single maintainer entry point: pick package + branch, bump version in package.json, run.
-# Syncs to basis-vpm and automatically triggers VPM publish there.
+# Single maintainer entry point: pick package, branch, and version bump type.
+# Bumps package.json, syncs to basis-vpm, and triggers VPM publish automatically.
 
 on:
   workflow_dispatch:
@@ -23,9 +23,25 @@ on:
           - '(workflow branch)'
           - feat/transparent-mirror
           - developer
+      bump_type:
+        description: Version bump applied to package.json before publish
+        required: true
+        type: choice
+        default: patch
+        options:
+          - major
+          - minor
+          - patch
+          - prerelease
+      prerelease_identifier:
+        description: >-
+          Prerelease identifier when bump_type=prerelease (e.g. rc, beta).
+          Leave empty for dev.<year>.W<week>.<run>.
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   HUB_REPO: minetake01/basis-vpm
@@ -52,37 +68,45 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.branch.outputs.ref }}
-          path: basis-src
 
       - name: Validate package is listed
         run: |
           set -euo pipefail
           PKG="${{ inputs.package }}"
-          if ! grep -qxF "$PKG" basis-src/.github/minetake-vpm-packages.txt; then
+          if ! grep -qxF "$PKG" .github/minetake-vpm-packages.txt; then
             echo "::error::${PKG} is not listed in .github/minetake-vpm-packages.txt"
             exit 1
           fi
 
-      - name: Read package version
+      - name: Bump package version
         id: meta
         env:
           PKG: ${{ inputs.package }}
+          BUMP_TYPE: ${{ inputs.bump_type }}
+          IDENTIFIER: ${{ inputs.prerelease_identifier }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
-          PKG_JSON="basis-src/${PACKAGE_ROOT}/${PKG}/package.json"
-          if [ ! -f "$PKG_JSON" ]; then
-            echo "::error::package.json not found at ${PKG_JSON}"
-            exit 1
-          fi
-          VERSION="$(python3 -c "import json; print(json.load(open('${PKG_JSON}'))['version'])")"
-          if [ -z "$VERSION" ]; then
-            echo "::error::version missing in package.json"
-            exit 1
-          fi
-          TAG="v${VERSION}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Package ${PKG} @ ${VERSION} (release tag ${TAG})"
+          PKG_JSON="${PACKAGE_ROOT}/${PKG}/package.json"
+          python3 .github/scripts/publish_helpers.py bump-package \
+            "$PKG_JSON" \
+            --bump-type "$BUMP_TYPE" \
+            --identifier "$IDENTIFIER" \
+            --run-number "$RUN_NUMBER" \
+            --write
+
+      - name: Commit version bump to source branch
+        env:
+          PKG: ${{ inputs.package }}
+          PUBLISH_VERSION: ${{ steps.meta.outputs.publish_version }}
+          BUMP_TYPE: ${{ inputs.bump_type }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${PACKAGE_ROOT}/${PKG}/package.json"
+          git commit -m "chore(vpm): ${PKG}@${PUBLISH_VERSION} (${BUMP_TYPE})"
+          git push
 
       - name: Checkout basis-vpm hub
         uses: actions/checkout@v4
@@ -92,13 +116,11 @@ jobs:
           path: basis-vpm
 
       - name: Sync package to hub
-        id: sync
         env:
           PKG: ${{ inputs.package }}
-          BRANCH: ${{ steps.branch.outputs.ref }}
         run: |
           set -euo pipefail
-          SRC="basis-src/${PACKAGE_ROOT}/${PKG}"
+          SRC="${PACKAGE_ROOT}/${PKG}"
           DEST="basis-vpm/Packages/${PKG}"
           if [ ! -d "$SRC" ]; then
             echo "::error::Package not found at ${SRC}"
@@ -119,7 +141,7 @@ jobs:
         env:
           PKG: ${{ inputs.package }}
           BRANCH: ${{ steps.branch.outputs.ref }}
-          VERSION: ${{ steps.meta.outputs.version }}
+          PUBLISH_VERSION: ${{ steps.meta.outputs.publish_version }}
         working-directory: basis-vpm
         run: |
           set -euo pipefail
@@ -130,7 +152,7 @@ jobs:
             echo "No file changes on hub (package content unchanged)."
             echo "pushed=false" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "sync: ${PKG}@${VERSION} from ${BRANCH}"
+            git commit -m "sync: ${PKG}@${PUBLISH_VERSION} from ${BRANCH}"
             git push
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
@@ -144,8 +166,12 @@ jobs:
           client-payload: >-
             {
               "package": "${{ inputs.package }}",
-              "version": "${{ steps.meta.outputs.version }}",
+              "base_version": "${{ steps.meta.outputs.previous_version }}",
+              "publish_version": "${{ steps.meta.outputs.publish_version }}",
+              "display_name": "${{ steps.meta.outputs.display_name }}",
               "tag": "${{ steps.meta.outputs.tag }}",
+              "release_name": "${{ steps.meta.outputs.release_name }}",
+              "prerelease": ${{ steps.meta.outputs.prerelease == 'true' }},
               "source_branch": "${{ steps.branch.outputs.ref }}",
               "source_sha": "${{ github.sha }}"
             }
