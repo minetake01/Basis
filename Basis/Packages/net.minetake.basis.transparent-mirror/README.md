@@ -12,6 +12,19 @@ Press the mode button to cycle:
 2. **Full** — reflects world geometry and avatars
 3. **Transparent** — reflects avatars only with a transparent background
 
+## Installation (VPM)
+
+Add both VPM repositories, then install this package:
+
+| Repository | URL |
+|---|---|
+| Basis (official) | `https://raw.githubusercontent.com/basisvr/Basis/vpm/vpm-repo.json` |
+| Minetake | `https://basis.minetake.net/vpm-repo.json` |
+
+Install `net.minetake.basis.transparent-mirror` via your VPM client (VRChat Creator Companion, ALCOM, etc.). Dependencies resolve from the Basis official repo.
+
+After install, register Addressables entries and build the prop bundle (see below).
+
 ## Usage
 
 ### Spawn from library
