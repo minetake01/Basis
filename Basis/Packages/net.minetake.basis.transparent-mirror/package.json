@@ -1,7 +1,7 @@
 {
   "name": "net.minetake.basis.transparent-mirror",
   "displayName": "Transparent Mirror",
-  "version": "1.0.0-dev.2026.W25.2",
+  "version": "1.0.0-dev.2026.W25.3.1",
   "description": "VRChat-style world mirror prop with Off / Full / Transparent modes cycled by a single local interactable button.",
   "author": {
     "name": "minetake",
