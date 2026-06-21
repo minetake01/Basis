@@ -124,8 +124,7 @@ function Find-ImportLibrary {
 Ensure-Repo
 Apply-Patches
 
-# cmake crate 0.1.54 (luau-dotnet pin) does not recognize VS 18 yet; Ninja + 17.0 label still uses the active MSVC toolchain.
-$env:CMAKE_GENERATOR = "Ninja"
+# cmake crate 0.1.54 (luau-dotnet pin) does not recognize VS 18 yet; relabeling keeps the default VS generator layout (build/Release).
 if ($env:VisualStudioVersion -match '^18\.') {
     $env:VisualStudioVersion = '17.0'
 }

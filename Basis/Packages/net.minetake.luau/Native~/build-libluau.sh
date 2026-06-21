@@ -26,6 +26,7 @@ mkdir -p "$WORK_ROOT" "$OUT_DIR"
 export CMAKE_GENERATOR="${CMAKE_GENERATOR:-Ninja}"
 
 if [[ "$TARGET_PLATFORM" == "linux-arm64" ]]; then
+  rustup target add "$CARGO_TARGET" --toolchain 1.86-x86_64-unknown-linux-gnu
   export CC="${CC:-aarch64-linux-gnu-gcc}"
   export CXX="${CXX:-aarch64-linux-gnu-g++}"
   export AR="${AR:-aarch64-linux-gnu-ar}"
@@ -102,13 +103,19 @@ cp "$LUau_DLL" "$PACKAGE_ROOT/Runtime/Luau.dll"
 
 export BASIS_LUAU_INCLUDE="$REPO_DIR/luau/VM/include"
 
+EXTRAS_LIB="$(find "$FFI_DIR/target/$CARGO_TARGET/release/build" -name 'libluau_ffi_extras.a' -print -quit)"
+if [[ -z "$EXTRAS_LIB" ]]; then
+  echo "luau_ffi_extras static library missing under $FFI_DIR/target/$CARGO_TARGET/release/build" >&2
+  exit 1
+fi
+
 case "$TARGET_PLATFORM" in
   osx) LIMITS_OUT="$OUT_DIR/libbasis_luau_limits.dylib" ;;
   *) LIMITS_OUT="$OUT_DIR/libbasis_luau_limits.so" ;;
 esac
 
 LINK_ARGS=(-shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT -I"$BASIS_LUAU_INCLUDE")
-LINK_ARGS+=("$ROOT/basis_luau_limits.c" "$PATCHES_DIR/luau_ffi_extras.c")
+LINK_ARGS+=("$ROOT/basis_luau_limits.c" "$EXTRAS_LIB")
 LINK_ARGS+=(-L"$ARTIFACT_DIR" -lluau)
 
 cc "${LINK_ARGS[@]}" -o "$LIMITS_OUT"

@@ -57,9 +57,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.86
         with:
           targets: aarch64-unknown-linux-gnu
+      - name: Install Rust aarch64 target (luau-ffi pins 1.86)
+        run: rustup target add aarch64-unknown-linux-gnu --toolchain 1.86-x86_64-unknown-linux-gnu
       - name: Install build deps
         run: |
           sudo apt-get update
