@@ -21,10 +21,13 @@ jobs:
         run: choco install llvm -y
       - name: Build Windows x64 natives
         shell: pwsh
-        run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.ps1
+        run: ./Basis/Packages/net.minetake.luau/Native~/build-runtime.ps1
       - name: Smoke test limits
         shell: pwsh
         run: ./Basis/Packages/net.minetake.luau/Native~/test-limits.ps1
+      - name: Smoke test runtime
+        shell: pwsh
+        run: ./Basis/Packages/net.minetake.luau/Native~/test-runtime.ps1
 
   linux-x64:
     runs-on: ubuntu-latest
