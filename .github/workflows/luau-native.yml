@@ -20,8 +20,8 @@ jobs:
         with:
           dotnet-version: '9.0.x'
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install LLVM and CMake
-        run: choco install llvm cmake -y
+      - name: Install LLVM, CMake, and Ninja
+        run: choco install llvm cmake ninja -y
       - name: Build libluau and limits (Windows x64)
         shell: pwsh
         run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.ps1
@@ -44,7 +44,9 @@ jobs:
           dotnet-version: '9.0.x'
       - uses: dtolnay/rust-toolchain@stable
       - name: Install build deps
-        run: sudo apt-get update && sudo apt-get install -y clang cmake build-essential
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake build-essential ninja-build libc++-dev libc++abi-dev
       - name: Build linux-x64 natives
         run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.sh linux-x64
 
@@ -56,9 +58,21 @@ jobs:
         with:
           dotnet-version: '9.0.x'
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
       - name: Install build deps
-        run: sudo apt-get update && sudo apt-get install -y clang cmake build-essential gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake build-essential ninja-build libc++-dev libc++abi-dev \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
       - name: Build linux-arm64 natives
+        env:
+          CC: aarch64-linux-gnu-gcc
+          CXX: aarch64-linux-gnu-g++
+          AR: aarch64-linux-gnu-ar
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.sh linux-arm64
 
   macos:

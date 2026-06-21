@@ -9,6 +9,10 @@ function Resolve-VcVars64 {
     }
 
     $relPaths = @(
+        "Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat",
+        "Microsoft Visual Studio\18\Professional\VC\Auxiliary\Build\vcvars64.bat",
+        "Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat",
+        "Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat",
         "Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat",
         "Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat",
         "Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat",

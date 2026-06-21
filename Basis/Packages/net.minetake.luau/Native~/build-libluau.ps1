@@ -28,6 +28,9 @@ if (Test-Path $vswhere) {
     }
 }
 $cmakeCandidates += @(
+    "${env:ProgramFiles}\Microsoft Visual Studio\18\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
+    "${env:ProgramFiles}\Microsoft Visual Studio\18\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
+    "${env:ProgramFiles}\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
     "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
     "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
     "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
@@ -120,6 +123,12 @@ function Find-ImportLibrary {
 
 Ensure-Repo
 Apply-Patches
+
+# cmake crate 0.1.54 (luau-dotnet pin) does not recognize VS 18 yet; Ninja + 17.0 label still uses the active MSVC toolchain.
+$env:CMAKE_GENERATOR = "Ninja"
+if ($env:VisualStudioVersion -match '^18\.') {
+    $env:VisualStudioVersion = '17.0'
+}
 
 Write-Host "Building libluau ($target) ..."
 Push-Location (Join-Path $repoDir "native\luau-ffi")

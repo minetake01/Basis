@@ -23,6 +23,17 @@ esac
 
 mkdir -p "$WORK_ROOT" "$OUT_DIR"
 
+export CMAKE_GENERATOR="${CMAKE_GENERATOR:-Ninja}"
+
+if [[ "$TARGET_PLATFORM" == "linux-arm64" ]]; then
+  export CC="${CC:-aarch64-linux-gnu-gcc}"
+  export CXX="${CXX:-aarch64-linux-gnu-g++}"
+  export AR="${AR:-aarch64-linux-gnu-ar}"
+  export CC_aarch64_unknown_linux_gnu="${CC_aarch64_unknown_linux_gnu:-aarch64-linux-gnu-gcc}"
+  export CXX_aarch64_unknown_linux_gnu="${CXX_aarch64_unknown_linux_gnu:-aarch64-linux-gnu-g++}"
+  export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER:-aarch64-linux-gnu-gcc}"
+fi
+
 if [[ ! -d "$REPO_DIR/.git" ]]; then
   git clone --filter=blob:none --no-checkout https://github.com/nuskey8/luau-dotnet.git "$REPO_DIR"
   (cd "$REPO_DIR" && git checkout "$PIN" && git submodule update --init --recursive)
@@ -77,6 +88,9 @@ elif [[ -f "$ARTIFACT_DIR/luau.so" ]]; then
   cp "$ARTIFACT_DIR/luau.so" "$OUT_DIR/luau.so"
 elif [[ -f "$ARTIFACT_DIR/libluau.dylib" ]]; then
   cp "$ARTIFACT_DIR/libluau.dylib" "$OUT_DIR/libluau.dylib"
+elif [[ -f "$ARTIFACT_DIR/luau.dylib" ]]; then
+  cp "$ARTIFACT_DIR/luau.dylib" "$OUT_DIR/libluau.dylib"
+  cp "$ARTIFACT_DIR/luau.dylib" "$OUT_DIR/luau.dylib"
 else
   echo "libluau artifact missing" >&2
   exit 1
@@ -87,10 +101,16 @@ LUau_DLL="$(find "$REPO_DIR/src/Luau/bin" -name Luau.dll | head -n 1)"
 cp "$LUau_DLL" "$PACKAGE_ROOT/Runtime/Luau.dll"
 
 export BASIS_LUAU_INCLUDE="$REPO_DIR/luau/VM/include"
-cc -shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT \
-  -I"$BASIS_LUAU_INCLUDE" \
-  "$ROOT/basis_luau_limits.c" \
-  -L"$ARTIFACT_DIR" -lluau \
-  -o "$OUT_DIR/libbasis_luau_limits.so"
+
+case "$TARGET_PLATFORM" in
+  osx) LIMITS_OUT="$OUT_DIR/libbasis_luau_limits.dylib" ;;
+  *) LIMITS_OUT="$OUT_DIR/libbasis_luau_limits.so" ;;
+esac
+
+LINK_ARGS=(-shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT -I"$BASIS_LUAU_INCLUDE")
+LINK_ARGS+=("$ROOT/basis_luau_limits.c" "$PATCHES_DIR/luau_ffi_extras.c")
+LINK_ARGS+=(-L"$ARTIFACT_DIR" -lluau)
+
+cc "${LINK_ARGS[@]}" -o "$LIMITS_OUT"
 
 echo "Built $OUT_DIR"
