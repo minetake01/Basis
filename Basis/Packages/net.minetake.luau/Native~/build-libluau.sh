@@ -125,19 +125,19 @@ esac
 
 case "$TARGET_PLATFORM" in
   osx)
-    LUau_LIB="$ARTIFACT_DIR/libluau.dylib"
-    if [[ ! -f "$LUau_LIB" ]]; then
-      LUau_LIB="$ARTIFACT_DIR/luau.dylib"
-    fi
-    if [[ ! -f "$LUau_LIB" ]]; then
-      echo "libluau dylib missing under $ARTIFACT_DIR" >&2
-      exit 1
-    fi
     cc -shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT \
       -I"$BASIS_LUAU_INCLUDE" \
       "$ROOT/basis_luau_limits.c" \
       -Wl,-force_load,"$EXTRAS_LIB" \
-      "$LUau_LIB" \
+      -Wl,-undefined,dynamic_lookup \
+      -o "$LIMITS_OUT"
+    ;;
+  linux-arm64)
+    aarch64-linux-gnu-gcc -shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT \
+      -I"$BASIS_LUAU_INCLUDE" \
+      "$ROOT/basis_luau_limits.c" \
+      -Wl,--whole-archive "$EXTRAS_LIB" -Wl,--no-whole-archive \
+      -L"$ARTIFACT_DIR" -lluau \
       -o "$LIMITS_OUT"
     ;;
   *)
