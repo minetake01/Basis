@@ -13,12 +13,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install LLVM (libclang)
-        run: choco install llvm -y
+      - name: Install LLVM and CMake
+        run: choco install llvm cmake -y
+      - name: Build libluau and limits (Windows x64)
+        shell: pwsh
+        run: ./Basis/Packages/net.minetake.luau/Native~/build-libluau.ps1
       - name: Build Windows x64 natives
         shell: pwsh
         run: ./Basis/Packages/net.minetake.luau/Native~/build-runtime.ps1

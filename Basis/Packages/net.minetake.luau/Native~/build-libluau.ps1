@@ -19,8 +19,19 @@ if (Test-Path (Join-Path $dotnet9 "dotnet.exe")) {
     $env:PATH = "$dotnet9;$env:PATH"
 }
 
-$cmakeCandidates = @(
+$cmakeCandidates = @()
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $vswhere) {
+    $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath 2>$null
+    if ($installPath) {
+        $cmakeCandidates += Join-Path $installPath "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin"
+    }
+}
+$cmakeCandidates += @(
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
     "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
     "${env:ProgramFiles}\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
     "${env:ProgramFiles}\CMake\bin"
 )

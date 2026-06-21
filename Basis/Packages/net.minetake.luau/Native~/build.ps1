@@ -1,18 +1,8 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $root "Resolve-VcVars64.ps1")
 $outDir = Join-Path (Split-Path -Parent $root) "Native\Plugins\win-x64"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-
-$vcvars = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-if (-not (Test-Path $vcvars)) {
-    $vcvars = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-}
-if (-not (Test-Path $vcvars)) {
-    $vcvars = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-}
-if (-not (Test-Path $vcvars)) {
-    Write-Error "MSVC vcvars64.bat not found. Install Visual Studio Build Tools with C++ workload."
-}
 
 $include = $env:BASIS_LUAU_INCLUDE
 if (-not $include) {
@@ -43,8 +33,9 @@ $dllBuilt = "$dll.built"
 $includeFlag = "/I`"$include`""
 $linkFlag = "/link `"$importLib`""
 
-cmd /c "`"$vcvars`" && cl /nologo /LD /O2 /DBASIS_LUAU_LIMITS_EXPORT $includeFlag `"$source`" /Fe:`"$dllBuilt`" $linkFlag"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$clArgs = "/nologo /LD /O2 /DBASIS_LUAU_LIMITS_EXPORT $includeFlag `"$source`" /Fe:`"$dllBuilt`" $linkFlag"
+$exitCode = Invoke-MsvcCl -Arguments $clArgs
+if ($exitCode -ne 0) { exit $exitCode }
 
 try {
     Copy-Item $dllBuilt $dll -Force
