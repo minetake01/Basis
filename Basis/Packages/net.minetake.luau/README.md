@@ -16,15 +16,23 @@ Vendored [nuskey8/luau-dotnet](https://github.com/nuskey8/luau-dotnet) for Basis
 
 UPM package name is `net.minetake.luau` only.
 
-## Native execution limits (v5)
+## Native execution limits + runtime (v6)
 
-Three binaries must match on each platform:
+Four binaries on Windows x64 Editor:
 
 | Binary | Role |
 |--------|------|
-| `libluau.dll` / `.so` / `.dylib` | Patched luau-dotnet FFI (`ffi_luaL_error_msg`, Rust link anchor) |
-| `Luau.dll` | Patched managed bindings (`LuauState.DisposeCore`: child `lua_unref`, root `lua_close`) |
-| `basis_luau_limits` | Interrupt + custom `lua_Alloc` memory cap (links `ffi_lua_*` only) |
+| `libluau.dll` | Patched luau-dotnet FFI |
+| `Luau.dll` | Managed bindings |
+| `basis_luau_limits.dll` | Legacy limits-only DLL |
+| `basis_luau_runtime.dll` | Unified runtime: limits + bytecode verifier + command ring + RCU snapshot + buffer pool + worker scheduler |
+
+Build runtime (includes limits):
+
+```powershell
+./Native~/build-runtime.ps1
+./Native~/test-runtime.ps1
+```
 
 `basis_luau_close_state` and C# raw pointer ownership are **not** used. Limits context is freed automatically when the root VM is closed via `LuauState.Dispose()`.
 

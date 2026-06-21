@@ -43,15 +43,10 @@ BASIS_LUAU_API lua_State* basis_luau_newstate_with_limits(
     basis_luau_init_error* out_error);
 
 BASIS_LUAU_API void basis_luau_set_execution_deadline(lua_State* L, int64_t deadline_ns_monotonic);
-
 BASIS_LUAU_API void basis_luau_begin_execution(lua_State* L, int64_t budget_ns);
-
 BASIS_LUAU_API void basis_luau_end_execution(lua_State* L);
-
 BASIS_LUAU_API uint64_t basis_luau_total_bytes(lua_State* L);
-
 BASIS_LUAU_API uint64_t basis_luau_memory_cap(lua_State* L);
-
 BASIS_LUAU_API basis_luau_disable_reason basis_luau_last_disable_reason(lua_State* L);
 
 #ifdef __cplusplus

@@ -93,6 +93,27 @@ namespace Luau.Unity
             return InvokeProtectedWithResults(state, function, args).Call;
         }
 
+        public void BeginProtectedLoad(LuauState state)
+        {
+            if (state == null)
+            {
+                return;
+            }
+
+            long budgetNs = GetValidatedBudgetNs();
+            BasisLuauNative.basis_luau_begin_execution(state.AsPointer(), budgetNs);
+        }
+
+        public void EndProtectedLoad(LuauState state)
+        {
+            if (state == null)
+            {
+                return;
+            }
+
+            BasisLuauNative.basis_luau_end_execution(state.AsPointer());
+        }
+
         public ProtectedInvokeResult InvokeProtectedWithResults(LuauState state, LuauFunction function, ReadOnlySpan<LuauValue> args)
         {
             if (state == null || function == null)
