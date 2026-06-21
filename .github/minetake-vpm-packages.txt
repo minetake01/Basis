@@ -1,0 +1,5 @@
+# net.minetake.basis.* packages published via the Minetake VPM hub.
+# One folder name per line (under Basis/Packages/).
+# Also add each new package to the choice list in publish-minetake-vpm.yml.
+
+net.minetake.basis.transparent-mirror
