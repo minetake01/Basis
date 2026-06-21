@@ -5,6 +5,7 @@ using Luau.Unity;
 using Minetake.Basis.Luau.Bindings;
 using Minetake.Basis.Luau.Policy;
 using Minetake.Basis.Luau.Registry;
+using Minetake.Basis.Luau.Runtime;
 using UnityEngine;
 
 namespace Minetake.Basis.Luau
@@ -19,7 +20,9 @@ namespace Minetake.Basis.Luau
 
         LuauExecutionLimits _limits;
         LuauState _rootState;
+        LuauHostRuntimeBridge _runtimeBridge;
         bool _stateDestroyed;
+        static uint _nextHostId = 1;
 
         public LuauHostKind HostKind => DefaultHostKind;
         public LuauObjectRegistry Registry => _registry;
@@ -27,16 +30,40 @@ namespace Minetake.Basis.Luau
         public LuauCapability Capability { get; private set; }
         public LuauWhitelistPolicy Policy { get; private set; }
         public bool HasLiveState => _rootState != null && !_stateDestroyed;
+        public LuauHostRuntimeBridge RuntimeBridge => _runtimeBridge;
+        internal bool RuntimeBridgeUsesPump() => IsLegacyReflectionEnabled();
+
+        static bool IsLegacyReflectionEnabled()
+        {
+            var settings = BasisLuauRuntimeSettings.GetOrCreate();
+            return settings.useWorkerScheduler && BasisLuauNativeRuntime.IsAvailable;
+        }
+
+        internal LuauFunction LoadBytecodeProtected(LuauState thread, byte[] verifiedBytecode, string moduleName)
+        {
+            _limits.BeginProtectedLoad(thread);
+            try
+            {
+                return thread.Load(verifiedBytecode, moduleName);
+            }
+            finally
+            {
+                _limits.EndProtectedLoad(thread);
+            }
+        }
 
         protected virtual void Awake()
         {
             Policy = LuauWhitelistPolicy.ForHost(HostKind);
             Capability = new LuauCapability(HostKind, transform, Policy);
+            _runtimeBridge = new LuauHostRuntimeBridge(this, _nextHostId++);
             InitializeStateIfNeeded();
         }
 
         protected void OnDestroy()
         {
+            _runtimeBridge?.Dispose();
+            _runtimeBridge = null;
             DestroyState(LuauDisableReason.Internal, "host destroyed");
         }
 
@@ -72,9 +99,38 @@ namespace Minetake.Basis.Luau
             Policy ??= LuauWhitelistPolicy.ForHost(HostKind);
             _limits = new LuauExecutionLimits();
             _rootState = _limits.CreateLimitedState();
+            _runtimeBridge?.EnsureNative(_limits, BasisLuauRuntimeSettings.GetOrCreate());
             RegisterStandardLibraries(_rootState);
             RegisterHostBindings(_rootState);
             LuauSandbox.ApplyRoot(_rootState);
+        }
+
+        internal void PumpLifecycleUpdate(float dt)
+        {
+            if (_stateDestroyed)
+            {
+                return;
+            }
+
+            var arg = LuauScriptProxy.SpanWithDeltaTime(dt);
+            for (int i = 0; i < _proxies.Count; i++)
+            {
+                _proxies[i].PumpUpdate(this, arg);
+            }
+        }
+
+        internal void PumpLifecycleFixedUpdate(float fixedDt)
+        {
+            if (_stateDestroyed)
+            {
+                return;
+            }
+
+            var arg = LuauScriptProxy.SpanWithDeltaTime(fixedDt);
+            for (int i = 0; i < _proxies.Count; i++)
+            {
+                _proxies[i].PumpFixedUpdate(this, arg);
+            }
         }
 
         protected virtual void RegisterStandardLibraries(LuauState state)
@@ -86,7 +142,11 @@ namespace Minetake.Basis.Luau
         {
             state.OpenLibrary<TransformBindings>();
             state.OpenLibrary<TimeBindings>();
-            ObjectBindings.Install(state);
+            if (!IsLegacyReflectionEnabled())
+            {
+                ObjectBindings.Install(state);
+            }
+
             RegisterServiceBindings(state);
         }
 

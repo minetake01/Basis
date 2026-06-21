@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Luau;
 using Luau.Unity;
 using Minetake.Basis.Luau.Registry;
+using Minetake.Basis.Luau.Runtime;
 using UnityEngine;
 
 namespace Minetake.Basis.Luau
@@ -85,9 +86,21 @@ namespace Minetake.Basis.Luau
 
         void Start() => _host?.InvokeLifecycle(this, "start", EmptyArgs);
 
-        void Update() => _host?.InvokeLifecycle(this, "update", SpanWith(Time.deltaTime));
+        void Update()
+        {
+            if (_host != null && !_host.RuntimeBridgeUsesPump())
+            {
+                _host.InvokeLifecycle(this, "update", SpanWith(Time.deltaTime));
+            }
+        }
 
-        void FixedUpdate() => _host?.InvokeLifecycle(this, "fixedUpdate", SpanWith(Time.fixedDeltaTime));
+        void FixedUpdate()
+        {
+            if (_host != null && !_host.RuntimeBridgeUsesPump())
+            {
+                _host.InvokeLifecycle(this, "fixedUpdate", SpanWith(Time.fixedDeltaTime));
+            }
+        }
 
         void LateUpdate() => _host?.InvokeLifecycle(this, "lateUpdate", SpanWith(Time.deltaTime));
 
@@ -202,12 +215,21 @@ namespace Minetake.Basis.Luau
                 return false;
             }
 
+            LuauBytecodeGate.GateResult gate = LuauBytecodeGate.ValidateForLoad(bytecode);
+            if (!gate.Success)
+            {
+                Disable(MapReason(gate.Reason), gate.Message);
+                return false;
+            }
+
+            byte[] verifiedBytecode = gate.VerifiedBytecode.ToArray();
+
             _host.InitializeStateIfNeeded();
             _host.RegisterProxy(this);
             handleRaws = RegisterSlotObjects(slotObjects);
 
             _thread = _host.CreateSandboxedThread();
-            LuauFunction chunk = _thread.Load(bytecode, moduleName);
+            LuauFunction chunk = _host.LoadBytecodeProtected(_thread, verifiedBytecode, moduleName);
             ProtectedInvokeResult invokeResult = _host.InvokeProtectedModuleLoad(this, chunk, EmptyArgs);
             if (!invokeResult.Call.Success)
             {
@@ -230,6 +252,21 @@ namespace Minetake.Basis.Luau
             _loaded = true;
             return true;
         }
+
+        static LuauDisableReason MapReason(LuauFailureReason reason) => reason switch
+        {
+            LuauFailureReason.BytecodeRejected => LuauDisableReason.Internal,
+            LuauFailureReason.SignatureRejected => LuauDisableReason.Internal,
+            _ => LuauDisableReason.Internal,
+        };
+
+        internal void PumpUpdate(LuauHostBase host, ReadOnlySpan<LuauValue> args) =>
+            host.InvokeLifecycle(this, "update", args);
+
+        internal void PumpFixedUpdate(LuauHostBase host, ReadOnlySpan<LuauValue> args) =>
+            host.InvokeLifecycle(this, "fixedUpdate", args);
+
+        internal static ReadOnlySpan<LuauValue> SpanWithDeltaTime(float value) => SpanWith(value);
 
         static ReadOnlySpan<LuauValue> SpanWith(double value)
         {

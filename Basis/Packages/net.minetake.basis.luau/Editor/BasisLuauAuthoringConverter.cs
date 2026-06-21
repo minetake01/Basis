@@ -5,6 +5,7 @@ using System.Text;
 using Luau;
 using Luau.Unity;
 using Minetake.Basis.Luau;
+using Minetake.Basis.Luau.Runtime;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -113,6 +114,7 @@ namespace Minetake.Basis.Luau.Editor
                 }
 
                 byte[] bytecode = CompileScript(behaviour.Script);
+                bytecode = LuauBytecodeSigner.AttachSignature(bytecode);
                 plans.Add(new ConversionPlan(behaviour, host, bytecode));
             }
 
