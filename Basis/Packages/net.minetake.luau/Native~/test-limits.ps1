@@ -40,16 +40,8 @@ public static class LimitsSmoke {
 }
 "@
 
-$provider = New-Object Microsoft.CSharp.CSharpCodeProvider
-$cp = New-Object System.CodeDom.Compiler.CompilerParameters
-$cp.GenerateExecutable = $true
-$cp.OutputAssembly = Join-Path $testDir "LimitsSmoke.exe"
-$cp.CompilerOptions = "/platform:x64"
-$cr = $provider.CompileAssemblyFromSource($cp, $code)
-if ($cr.Errors.HasErrors) {
-    $cr.Errors | ForEach-Object { Write-Error $_.ToString() }
-    exit 1
-}
+. (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "Compile-SmokeExe.ps1")
+Compile-SmokeExe -SourceCode $code -OutputExe (Join-Path $testDir "LimitsSmoke.exe")
 Push-Location $testDir
 & .\LimitsSmoke.exe
 $exit = $LASTEXITCODE

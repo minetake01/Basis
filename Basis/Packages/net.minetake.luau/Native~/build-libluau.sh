@@ -97,9 +97,18 @@ else
   exit 1
 fi
 
-(cd "$REPO_DIR/src/Luau" && dotnet build -c Release)
-LUau_DLL="$(find "$REPO_DIR/src/Luau/bin" -name Luau.dll | head -n 1)"
-cp "$LUau_DLL" "$PACKAGE_ROOT/Runtime/Luau.dll"
+if [[ "$TARGET_PLATFORM" != "linux-arm64" ]]; then
+  (cd "$REPO_DIR/src/Luau" && dotnet build -c Release -f netstandard2.1)
+  LUau_DLL="$(find "$REPO_DIR/src/Luau/bin/Release/netstandard2.1" -name Luau.dll | head -n 1)"
+  if [[ -z "$LUau_DLL" ]]; then
+    LUau_DLL="$(find "$REPO_DIR/src/Luau/bin" -name Luau.dll | head -n 1)"
+  fi
+  if [[ -n "$LUau_DLL" ]]; then
+    cp "$LUau_DLL" "$PACKAGE_ROOT/Runtime/Luau.dll"
+  fi
+else
+  echo "Skipping Luau.dll build on linux-arm64 (cross-target bindgen output is not used here)."
+fi
 
 export BASIS_LUAU_INCLUDE="$REPO_DIR/luau/VM/include"
 
@@ -114,10 +123,31 @@ case "$TARGET_PLATFORM" in
   *) LIMITS_OUT="$OUT_DIR/libbasis_luau_limits.so" ;;
 esac
 
-LINK_ARGS=(-shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT -I"$BASIS_LUAU_INCLUDE")
-LINK_ARGS+=("$ROOT/basis_luau_limits.c" "$EXTRAS_LIB")
-LINK_ARGS+=(-L"$ARTIFACT_DIR" -lluau)
-
-cc "${LINK_ARGS[@]}" -o "$LIMITS_OUT"
+case "$TARGET_PLATFORM" in
+  osx)
+    LUau_LIB="$ARTIFACT_DIR/libluau.dylib"
+    if [[ ! -f "$LUau_LIB" ]]; then
+      LUau_LIB="$ARTIFACT_DIR/luau.dylib"
+    fi
+    if [[ ! -f "$LUau_LIB" ]]; then
+      echo "libluau dylib missing under $ARTIFACT_DIR" >&2
+      exit 1
+    fi
+    cc -shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT \
+      -I"$BASIS_LUAU_INCLUDE" \
+      "$ROOT/basis_luau_limits.c" \
+      -Wl,-force_load,"$EXTRAS_LIB" \
+      "$LUau_LIB" \
+      -o "$LIMITS_OUT"
+    ;;
+  *)
+    cc -shared -fPIC -O2 -DBASIS_LUAU_LIMITS_EXPORT \
+      -I"$BASIS_LUAU_INCLUDE" \
+      "$ROOT/basis_luau_limits.c" \
+      -Wl,--whole-archive "$EXTRAS_LIB" -Wl,--no-whole-archive \
+      -L"$ARTIFACT_DIR" -lluau \
+      -o "$LIMITS_OUT"
+    ;;
+esac
 
 echo "Built $OUT_DIR"

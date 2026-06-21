@@ -47,16 +47,8 @@ public static class RuntimeSmoke {
 }
 "@
 
-$provider = New-Object Microsoft.CSharp.CSharpCodeProvider
-$cp = New-Object System.CodeDom.Compiler.CompilerParameters
-$cp.GenerateExecutable = $true
-$cp.OutputAssembly = Join-Path $testDir "RuntimeSmoke.exe"
-$cp.CompilerOptions = "/platform:x64"
-$cr = $provider.CompileAssemblyFromSource($cp, $code)
-if ($cr.Errors.HasErrors) {
-    $cr.Errors | ForEach-Object { Write-Error $_.ToString() }
-    exit 1
-}
+. (Join-Path $root "Compile-SmokeExe.ps1")
+Compile-SmokeExe -SourceCode $code -OutputExe (Join-Path $testDir "RuntimeSmoke.exe")
 Push-Location $testDir
 & .\RuntimeSmoke.exe
 $exit = $LASTEXITCODE
