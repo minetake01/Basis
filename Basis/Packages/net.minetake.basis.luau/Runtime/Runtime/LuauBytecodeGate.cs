@@ -47,21 +47,25 @@ namespace Minetake.Basis.Luau.Runtime
                 bytecode = payload;
             }
 
-            if (BasisLuauNativeRuntime.IsAvailable)
+            if (!BasisLuauNativeRuntime.IsAvailable)
             {
-                unsafe
-                {
-                    fixed (byte* ptr = bytecode)
-                    {
-                        BasisLuauVerifyError err = BasisLuauNativeRuntime.VerifyBytecode(
-                            ptr,
-                            (nuint)bytecode.Length,
-                            (nuint)settings.maxBytecodeBytes);
+                return Fail(
+                    LuauFailureReason.BytecodeRejected,
+                    $"native runtime unavailable: {BasisLuauNativeRuntime.UnavailableReason}");
+            }
 
-                        if (err != BasisLuauVerifyError.Ok)
-                        {
-                            return Fail(LuauFailureReason.BytecodeRejected, $"verifier: {err}");
-                        }
+            unsafe
+            {
+                fixed (byte* ptr = bytecode)
+                {
+                    BasisLuauVerifyError err = BasisLuauNativeRuntime.VerifyBytecode(
+                        ptr,
+                        (nuint)bytecode.Length,
+                        (nuint)settings.maxBytecodeBytes);
+
+                    if (err != BasisLuauVerifyError.Ok)
+                    {
+                        return Fail(LuauFailureReason.BytecodeRejected, $"verifier: {err}");
                     }
                 }
             }
@@ -73,7 +77,7 @@ namespace Minetake.Basis.Luau.Runtime
                     return Fail(LuauFailureReason.SignatureRejected, "signature mismatch");
                 }
             }
-            else if (!settings.MayLoadUnsignedBytecode() && settings.requireSignedBytecode)
+            else if (!settings.AllowsUnsignedBytecodeInEditor())
             {
                 return Fail(LuauFailureReason.SignatureRejected, "unsigned bytecode rejected");
             }

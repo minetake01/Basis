@@ -11,12 +11,6 @@ namespace Minetake.Basis.Luau.Runtime
         static void ResetInstance() => Instance = null;
 
         [Header("Security")]
-        [Tooltip("Editor/Development only. Never enable in release player builds.")]
-        public bool allowUnsignedBytecodeInDev = true;
-
-        [Tooltip("Require signed bytecode in all builds when runtime bridge is active.")]
-        public bool requireSignedBytecode = true;
-
         public int maxBytecodeBytes = 512 * 1024;
         public int maxCommandBytesPerSlice = 256 * 1024;
         public int maxCommandsPerSlice = 8192;
@@ -25,7 +19,6 @@ namespace Minetake.Basis.Luau.Runtime
         public int maxPayloadBytes = 1024 * 1024;
 
         [Header("Workers")]
-        public bool useWorkerScheduler = false;
         public int maxWorkers = 4;
 
         public static BasisLuauRuntimeSettings GetOrCreate()
@@ -40,10 +33,10 @@ namespace Minetake.Basis.Luau.Runtime
             return Instance;
         }
 
-        public bool MayLoadUnsignedBytecode()
+        public bool AllowsUnsignedBytecodeInEditor()
         {
-#if BASIS_LUAU_DEV_BRIDGE
-            return allowUnsignedBytecodeInDev && Debug.isDebugBuild;
+#if UNITY_EDITOR
+            return true;
 #else
             return false;
 #endif

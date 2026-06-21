@@ -9,7 +9,7 @@ return {
     end,
     update = function(dt)
         if LABEL ~= 0 then
-            basis_object.setField(LABEL, "text", string.format("Luau %.2f", dt))
+            basis_ui.setText(LABEL, string.format("Luau %.2f", dt))
         end
     end,
 }

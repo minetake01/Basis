@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using Luau.Unity;
+using UnityEngine;
 
 namespace Luau.Unity
 {
@@ -73,6 +74,16 @@ namespace Luau.Unity
         public bool IsCreated => _handle != IntPtr.Zero;
 
         static bool? _isAvailable;
+        static string _unavailableReason;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetAvailability()
+        {
+            _isAvailable = null;
+            _unavailableReason = null;
+        }
+
+        public static string UnavailableReason => _unavailableReason;
 
         public static bool IsAvailable
         {
@@ -85,27 +96,43 @@ namespace Luau.Unity
 
                 try
                 {
-                    var cfg = new BasisLuauLimitsConfig { memory_cap_bytes = 1024 * 1024 };
+                    var cfg = new BasisLuauLimitsConfig { memory_cap_bytes = 8 * 1024 * 1024 };
                     basis_luau_init_error err;
                     IntPtr probe = RuntimeCreate(ref cfg, &err);
                     if (probe == IntPtr.Zero)
                     {
+                        _unavailableReason = $"basis_luau_runtime_create failed: {err}";
                         _isAvailable = false;
                     }
                     else
                     {
                         RuntimeDestroy(probe);
+                        _unavailableReason = null;
                         _isAvailable = true;
                     }
                 }
-                catch (DllNotFoundException)
+                catch (DllNotFoundException ex)
                 {
+                    _unavailableReason = $"DLL not found: {ex.Message}";
                     _isAvailable = false;
                 }
-                catch (EntryPointNotFoundException)
+                catch (EntryPointNotFoundException ex)
                 {
+                    _unavailableReason = $"Entry point not found: {ex.Message}";
                     _isAvailable = false;
                 }
+                catch (Exception ex)
+                {
+                    _unavailableReason = ex.Message;
+                    _isAvailable = false;
+                }
+
+#if UNITY_EDITOR
+                if (!_isAvailable.Value && !string.IsNullOrEmpty(_unavailableReason))
+                {
+                    UnityEngine.Debug.LogWarning($"[BasisLuau] Native runtime unavailable: {_unavailableReason}");
+                }
+#endif
 
                 return _isAvailable.Value;
             }

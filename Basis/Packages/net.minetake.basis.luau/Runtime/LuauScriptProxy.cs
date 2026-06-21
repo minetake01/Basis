@@ -86,22 +86,6 @@ namespace Minetake.Basis.Luau
 
         void Start() => _host?.InvokeLifecycle(this, "start", EmptyArgs);
 
-        void Update()
-        {
-            if (_host != null && !_host.RuntimeBridgeUsesPump())
-            {
-                _host.InvokeLifecycle(this, "update", SpanWith(Time.deltaTime));
-            }
-        }
-
-        void FixedUpdate()
-        {
-            if (_host != null && !_host.RuntimeBridgeUsesPump())
-            {
-                _host.InvokeLifecycle(this, "fixedUpdate", SpanWith(Time.fixedDeltaTime));
-            }
-        }
-
         void LateUpdate() => _host?.InvokeLifecycle(this, "lateUpdate", SpanWith(Time.deltaTime));
 
         void OnEnable() => InvokeOnEnableIfNeeded();
@@ -218,6 +202,7 @@ namespace Minetake.Basis.Luau
             LuauBytecodeGate.GateResult gate = LuauBytecodeGate.ValidateForLoad(bytecode);
             if (!gate.Success)
             {
+                Debug.LogWarning($"[BasisLuau] Script '{name}' failed bytecode gate: {gate.Message}");
                 Disable(MapReason(gate.Reason), gate.Message);
                 return false;
             }

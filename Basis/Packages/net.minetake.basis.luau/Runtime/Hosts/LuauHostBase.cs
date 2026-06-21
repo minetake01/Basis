@@ -31,13 +31,6 @@ namespace Minetake.Basis.Luau
         public LuauWhitelistPolicy Policy { get; private set; }
         public bool HasLiveState => _rootState != null && !_stateDestroyed;
         public LuauHostRuntimeBridge RuntimeBridge => _runtimeBridge;
-        internal bool RuntimeBridgeUsesPump() => IsLegacyReflectionEnabled();
-
-        static bool IsLegacyReflectionEnabled()
-        {
-            var settings = BasisLuauRuntimeSettings.GetOrCreate();
-            return settings.useWorkerScheduler && BasisLuauNativeRuntime.IsAvailable;
-        }
 
         internal LuauFunction LoadBytecodeProtected(LuauState thread, byte[] verifiedBytecode, string moduleName)
         {
@@ -142,11 +135,7 @@ namespace Minetake.Basis.Luau
         {
             state.OpenLibrary<TransformBindings>();
             state.OpenLibrary<TimeBindings>();
-            if (!IsLegacyReflectionEnabled())
-            {
-                ObjectBindings.Install(state);
-            }
-
+            state.OpenLibrary<UiBindings>();
             RegisterServiceBindings(state);
         }
 

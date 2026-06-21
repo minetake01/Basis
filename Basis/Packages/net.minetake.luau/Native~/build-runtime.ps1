@@ -54,5 +54,5 @@ catch {
 
 Write-Host "Built $(if (Test-Path $dll) { $dll } else { $dllBuilt })"
 
-# Keep legacy limits DLL for existing LuauExecutionLimits until full migration.
+& (Join-Path $root "deploy-built.ps1")
 & (Join-Path $root "build.ps1")

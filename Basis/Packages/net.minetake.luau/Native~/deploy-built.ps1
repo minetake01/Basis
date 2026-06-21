@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 $pluginsDir = Join-Path (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)) "Native\Plugins\win-x64"
 
-foreach ($name in @("libluau.dll", "basis_luau_limits.dll")) {
+foreach ($name in @("libluau.dll", "basis_luau_limits.dll", "basis_luau_runtime.dll")) {
     $built = Join-Path $pluginsDir "$name.built"
     $dest = Join-Path $pluginsDir $name
     if (-not (Test-Path $built)) {

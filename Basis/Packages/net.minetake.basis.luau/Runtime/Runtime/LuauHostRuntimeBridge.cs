@@ -35,16 +35,14 @@ namespace Minetake.Basis.Luau.Runtime
 
             if (!BasisLuauNativeRuntime.IsAvailable)
             {
-                return;
+                throw new InvalidOperationException(
+                    $"Basis Luau native runtime is required: {BasisLuauNativeRuntime.UnavailableReason}");
             }
 
             _native = new BasisLuauNativeRuntime();
             _native.Create(limits);
-            if (settings.useWorkerScheduler)
-            {
-                int workers = Mathf.Clamp(settings.maxWorkers, 1, 4);
-                _native.StartScheduler(workers);
-            }
+            int workers = Mathf.Clamp(settings.maxWorkers, 1, 4);
+            _native.StartScheduler(workers);
         }
 
         internal LuauWorkerShadowState GetShadow(uint proxyId)
@@ -69,11 +67,12 @@ namespace Minetake.Basis.Luau.Runtime
             PublishSnapshots();
             _events.DrainToNative(_native);
 
-            if (BasisLuauRuntimeSettings.GetOrCreate().useWorkerScheduler && _native != null && _native.IsCreated)
+            if (_native != null && _native.IsCreated)
             {
                 _native.KickScheduler();
-                _host.PumpLifecycleUpdate(dt);
             }
+
+            _host.PumpLifecycleUpdate(dt);
         }
 
         public void PumpFixedUpdate(float fixedDt)
@@ -83,10 +82,7 @@ namespace Minetake.Basis.Luau.Runtime
                 return;
             }
 
-            if (BasisLuauRuntimeSettings.GetOrCreate().useWorkerScheduler)
-            {
-                _host.PumpLifecycleFixedUpdate(fixedDt);
-            }
+            _host.PumpLifecycleFixedUpdate(fixedDt);
         }
 
         void FlushCommands()

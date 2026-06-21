@@ -18,5 +18,8 @@ namespace Minetake.Basis.Luau.Bindings
 
         [LuauMember("unscaledDeltaTime")]
         public static double UnscaledDeltaTime() => Time.unscaledDeltaTime;
+
+        [LuauMember("now")]
+        public static string Now() => System.DateTime.Now.ToString();
     }
 }
