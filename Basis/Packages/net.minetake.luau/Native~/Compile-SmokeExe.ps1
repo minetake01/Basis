@@ -4,7 +4,10 @@ function Compile-SmokeExe {
         [Parameter(Mandatory = $true)][string]$OutputExe
     )
 
-    $sourceFile = "$OutputExe.cs"
+    $outputDir = Split-Path -Parent $OutputExe
+    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+
+    $sourceFile = Join-Path ([System.IO.Path]::GetTempPath()) ("basis_luau_smoke_" + [Guid]::NewGuid().ToString("N") + ".cs")
     Set-Content -Path $sourceFile -Value $SourceCode -Encoding UTF8
 
     $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
@@ -13,5 +16,7 @@ function Compile-SmokeExe {
     }
 
     & $csc /nologo /platform:x64 "/out:$OutputExe" $sourceFile
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $exitCode = $LASTEXITCODE
+    Remove-Item $sourceFile -Force -ErrorAction SilentlyContinue
+    if ($exitCode -ne 0) { exit $exitCode }
 }

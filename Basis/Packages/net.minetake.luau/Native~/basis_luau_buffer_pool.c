@@ -129,3 +129,24 @@ void basis_luau_buffer_pool_release(basis_luau_buffer_pool* pool, const basis_lu
         pool->host_buffer_count -= 1;
     }
 }
+
+int basis_luau_buffer_pool_get(
+    basis_luau_buffer_pool* pool,
+    const basis_luau_buffer_ref* ref,
+    uint8_t** out_bytes,
+    uint32_t* out_length)
+{
+    if (!pool || !ref || !out_bytes || !out_length) {
+        return 0;
+    }
+    if (ref->slot >= pool->capacity) {
+        return 0;
+    }
+    basis_luau_buffer_slot* slot = &pool->slots[ref->slot];
+    if (slot->generation != ref->generation || slot->host_id != ref->host_id || slot->bytes == NULL) {
+        return 0;
+    }
+    *out_bytes = slot->bytes;
+    *out_length = slot->length;
+    return 1;
+}

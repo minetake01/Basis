@@ -1,6 +1,8 @@
 using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Luau;
 using Luau.Native;
 
@@ -29,6 +31,38 @@ namespace Luau.Unity
         public LuauValue[] ReturnValues { get; init; }
     }
 
+    public static class LuauFunctionInvoke
+    {
+        public static LuauValue[] InvokeWithResults(LuauFunction function, ReadOnlySpan<LuauValue> args)
+        {
+            if (function == null)
+            {
+                return null;
+            }
+
+            LuauState state = function.State;
+            state.Push(function);
+            for (int i = 0; i < args.Length; i++)
+            {
+                state.Push(args[i]);
+            }
+
+            int nResults = function.InvokeAsync(args.Length, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+            if (nResults <= 0)
+            {
+                return Array.Empty<LuauValue>();
+            }
+
+            var results = new LuauValue[nResults];
+            for (int i = nResults - 1; i >= 0; i--)
+            {
+                results[i] = state.Pop();
+            }
+
+            return results;
+        }
+    }
+
     public sealed unsafe class LuauExecutionLimits : IDisposable
     {
         const long MaxBudgetNs = 3_600_000_000_000L;
@@ -42,56 +76,26 @@ namespace Luau.Unity
             types: new[] { typeof(lua_State*) },
             modifiers: null);
 
+        IntPtr _runtimeHandle;
+        LuauState _rootState;
+
         public TimeSpan ExecutionBudget { get; set; } = TimeSpan.FromMilliseconds(500);
         public nuint MemoryBudgetBytes { get; set; } = 8 * 1024 * 1024;
+        public LuauState RootState => _rootState;
 
-        public LuauState CreateLimitedState()
+        public void AttachRuntime(IntPtr runtimeHandle, lua_State* rootPtr)
         {
-            try
+            _runtimeHandle = runtimeHandle;
+            if (CreateStateInternal == null)
             {
-                var config = new BasisLuauLimitsConfig
-                {
-                    memory_cap_bytes = MemoryBudgetBytes,
-                };
+                throw new InvalidOperationException("LuauState.CreateStateInternal reflection failed.");
+            }
 
-                basis_luau_init_error initError = basis_luau_init_error.None;
-                lua_State* ptr = BasisLuauNative.basis_luau_newstate_with_limits(ref config, &initError);
-                if (ptr == null)
-                {
-                    throw CreateInitException(initError);
-                }
-
-                if (CreateStateInternal == null)
-                {
-                    throw new InvalidOperationException("LuauState.CreateStateInternal reflection failed.");
-                }
-
-                return ((CreateStateInternalDelegate)Delegate.CreateDelegate(typeof(CreateStateInternalDelegate), CreateStateInternal))(ptr);
-            }
-            catch (DllNotFoundException ex)
-            {
-                throw new InvalidOperationException(
-                    "Failed to load basis_luau_limits or libluau. Rebuild Native~/build-libluau.ps1 for this platform.",
-                    ex);
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                throw new InvalidOperationException(
-                    "basis_luau_limits export mismatch. Rebuild Native~/build.ps1.",
-                    ex);
-            }
-            catch (BadImageFormatException ex)
-            {
-                throw new InvalidOperationException(
-                    "basis_luau_limits or libluau ABI/architecture mismatch (x64 required).",
-                    ex);
-            }
+            _rootState = ((CreateStateInternalDelegate)Delegate.CreateDelegate(typeof(CreateStateInternalDelegate), CreateStateInternal))(rootPtr);
         }
 
-        public ProtectedCallResult InvokeProtected(LuauState state, LuauFunction function, ReadOnlySpan<LuauValue> args)
-        {
-            return InvokeProtectedWithResults(state, function, args).Call;
-        }
+        public ProtectedCallResult InvokeProtected(LuauState state, LuauFunction function, ReadOnlySpan<LuauValue> args) =>
+            InvokeProtectedWithResults(state, function, args).Call;
 
         public void BeginProtectedLoad(LuauState state)
         {
@@ -100,8 +104,7 @@ namespace Luau.Unity
                 return;
             }
 
-            long budgetNs = GetValidatedBudgetNs();
-            BasisLuauNative.basis_luau_begin_execution(state.AsPointer(), budgetNs);
+            BasisLuauNativeRuntime.BeginExecution(state.AsPointer(), GetValidatedBudgetNs());
         }
 
         public void EndProtectedLoad(LuauState state)
@@ -111,7 +114,7 @@ namespace Luau.Unity
                 return;
             }
 
-            BasisLuauNative.basis_luau_end_execution(state.AsPointer());
+            BasisLuauNativeRuntime.EndExecution(state.AsPointer());
         }
 
         public ProtectedInvokeResult InvokeProtectedWithResults(LuauState state, LuauFunction function, ReadOnlySpan<LuauValue> args)
@@ -133,12 +136,12 @@ namespace Luau.Unity
 
             long budgetNs = GetValidatedBudgetNs();
             lua_State* L = state.AsPointer();
-            BasisLuauNative.basis_luau_begin_execution(L, budgetNs);
+            BasisLuauNativeRuntime.BeginExecution(L, budgetNs);
 
             try
             {
-                LuauValue[] results = function.InvokeAsync(args.ToArray()).AsTask().GetAwaiter().GetResult();
-                BasisLuauNative.basis_luau_end_execution(L);
+                LuauValue[] results = LuauFunctionInvoke.InvokeWithResults(function, args);
+                BasisLuauNativeRuntime.EndExecution(L);
                 return new ProtectedInvokeResult
                 {
                     Call = new ProtectedCallResult
@@ -152,8 +155,8 @@ namespace Luau.Unity
             }
             catch (Exception ex)
             {
-                BasisLuauNative.basis_luau_end_execution(L);
-                LuauDisableReason reason = MapReason(BasisLuauNative.basis_luau_last_disable_reason(L), ex);
+                BasisLuauNativeRuntime.EndExecution(L);
+                LuauDisableReason reason = MapReason(BasisLuauNativeRuntime.LastDisableReason(L), ex);
                 return new ProtectedInvokeResult
                 {
                     Call = new ProtectedCallResult
@@ -183,12 +186,12 @@ namespace Luau.Unity
 
             long budgetNs = GetValidatedBudgetNs();
             lua_State* L = state.AsPointer();
-            BasisLuauNative.basis_luau_begin_execution(L, budgetNs);
+            BasisLuauNativeRuntime.BeginExecution(L, budgetNs);
 
             try
             {
                 state.DoString(sourceUtf8);
-                BasisLuauNative.basis_luau_end_execution(L);
+                BasisLuauNativeRuntime.EndExecution(L);
                 return new ProtectedCallResult
                 {
                     Success = true,
@@ -198,8 +201,8 @@ namespace Luau.Unity
             }
             catch (Exception ex)
             {
-                BasisLuauNative.basis_luau_end_execution(L);
-                LuauDisableReason reason = MapReason(BasisLuauNative.basis_luau_last_disable_reason(L), ex);
+                BasisLuauNativeRuntime.EndExecution(L);
+                LuauDisableReason reason = MapReason(BasisLuauNativeRuntime.LastDisableReason(L), ex);
                 return new ProtectedCallResult
                 {
                     Success = false,
@@ -210,18 +213,11 @@ namespace Luau.Unity
             }
         }
 
-        public nuint GetTotalBytes(LuauState state)
-        {
-            if (state == null)
-            {
-                return 0;
-            }
-
-            return (nuint)BasisLuauNative.basis_luau_total_bytes(state.AsPointer());
-        }
-
         public void Dispose()
         {
+            _rootState?.Dispose();
+            _rootState = null;
+            _runtimeHandle = IntPtr.Zero;
         }
 
         long GetValidatedBudgetNs()
@@ -245,14 +241,6 @@ namespace Luau.Unity
 
             return budgetNs;
         }
-
-        static InvalidOperationException CreateInitException(basis_luau_init_error error) => error switch
-        {
-            basis_luau_init_error.InvalidConfig => new InvalidOperationException("basis_luau_newstate_with_limits: invalid config."),
-            basis_luau_init_error.CtxAllocFailed => new InvalidOperationException("basis_luau_newstate_with_limits: context allocation failed."),
-            basis_luau_init_error.VmAllocFailed => new InvalidOperationException("basis_luau_newstate_with_limits: VM allocation failed."),
-            _ => new InvalidOperationException("basis_luau_newstate_with_limits failed. Rebuild Native~/build-libluau.ps1 for this platform."),
-        };
 
         static LuauDisableReason MapReason(BasisLuauDisableReason native, Exception ex)
         {
@@ -289,42 +277,12 @@ namespace Luau.Unity
         VmAllocFailed = 3,
     }
 
-    internal enum BasisLuauDisableReason
+    public enum BasisLuauDisableReason
     {
         None = 0,
         Timeout = 1,
         AllocFailure = 2,
         Panic = 3,
         Internal = 4,
-    }
-
-    internal static unsafe class BasisLuauNative
-    {
-#if (UNITY_IOS || UNITY_WEBGL) && !UNITY_EDITOR
-        const string DllName = "__Internal";
-#else
-        const string DllName = "basis_luau_limits";
-#endif
-
-        [DllImport(DllName, EntryPoint = "basis_luau_newstate_with_limits", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern lua_State* basis_luau_newstate_with_limits(ref BasisLuauLimitsConfig config, basis_luau_init_error* out_error);
-
-        [DllImport(DllName, EntryPoint = "basis_luau_set_execution_deadline", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void basis_luau_set_execution_deadline(lua_State* L, long deadline_ns_monotonic);
-
-        [DllImport(DllName, EntryPoint = "basis_luau_begin_execution", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void basis_luau_begin_execution(lua_State* L, long budget_ns);
-
-        [DllImport(DllName, EntryPoint = "basis_luau_end_execution", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void basis_luau_end_execution(lua_State* L);
-
-        [DllImport(DllName, EntryPoint = "basis_luau_total_bytes", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern ulong basis_luau_total_bytes(lua_State* L);
-
-        [DllImport(DllName, EntryPoint = "basis_luau_memory_cap", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern ulong basis_luau_memory_cap(lua_State* L);
-
-        [DllImport(DllName, EntryPoint = "basis_luau_last_disable_reason", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern BasisLuauDisableReason basis_luau_last_disable_reason(lua_State* L);
     }
 }

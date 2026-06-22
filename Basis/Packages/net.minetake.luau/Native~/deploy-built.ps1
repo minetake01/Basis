@@ -1,7 +1,28 @@
 $ErrorActionPreference = "Stop"
-$pluginsDir = Join-Path (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)) "Native\Plugins\win-x64"
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$pluginsDir = Join-Path (Split-Path -Parent $root) "Native\Plugins\win-x64"
 
-foreach ($name in @("libluau.dll", "basis_luau_limits.dll", "basis_luau_runtime.dll")) {
+function Remove-PluginBuildArtifacts {
+    param([string]$PluginsDir)
+    foreach ($name in @(
+            "basis_luau_runtime.dll.built",
+            "basis_luau_runtime.dll.exp",
+            "basis_luau_runtime.dll.lib",
+            "basis_luau_limits.dll.exp",
+            "basis_luau_limits.dll.lib",
+            "basis_luau_limits.exp",
+            "basis_luau_limits.lib",
+            "libluau.dll.tmp",
+            "ExportCheck.exe",
+            "ExportCheck.exe.cs")) {
+        Remove-Item (Join-Path $PluginsDir $name) -Force -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $PluginsDir "$name.meta") -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item (Join-Path $PluginsDir "export-check") -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $PluginsDir "export-check.meta") -Force -ErrorAction SilentlyContinue
+}
+
+foreach ($name in @("luau.dll", "basis_luau_limits.dll", "basis_luau_runtime.dll")) {
     $built = Join-Path $pluginsDir "$name.built"
     $dest = Join-Path $pluginsDir $name
     if (-not (Test-Path $built)) {
@@ -12,10 +33,5 @@ foreach ($name in @("libluau.dll", "basis_luau_limits.dll", "basis_luau_runtime.
     Write-Host "Deployed $dest"
 }
 
-$libBuilt = Join-Path $pluginsDir "libluau.dll.built"
-if (Test-Path $libBuilt) {
-    Copy-Item $libBuilt (Join-Path $pluginsDir "luau.dll") -Force
-    Write-Host "Deployed luau.dll (alias of libluau)"
-}
-
+Remove-PluginBuildArtifacts $pluginsDir
 Write-Host "Close Unity/Cursor if copy fails due to file locks."

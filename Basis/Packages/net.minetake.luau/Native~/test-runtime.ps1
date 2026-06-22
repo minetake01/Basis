@@ -9,6 +9,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $testDir = Join-Path $env:TEMP "basis-luau-runtime-test"
+Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $testDir | Out-Null
 
 function Stage([string]$name) {
@@ -19,8 +20,7 @@ function Stage([string]$name) {
     else { throw "Missing $name" }
 }
 
-Stage "libluau.dll"
-Copy-Item (Join-Path $testDir "libluau.dll") (Join-Path $testDir "luau.dll") -Force
+Stage "luau.dll"
 Stage "basis_luau_runtime.dll"
 
 $code = @"

@@ -4,6 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $testDir = Join-Path $env:TEMP "basis-luau-limits-test"
+Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $testDir | Out-Null
 
 function Stage([string]$name) {
@@ -14,8 +15,7 @@ function Stage([string]$name) {
     else { throw "Missing $name" }
 }
 
-Stage "libluau.dll"
-Copy-Item (Join-Path $testDir "libluau.dll") (Join-Path $testDir "luau.dll") -Force
+Stage "luau.dll"
 Stage "basis_luau_limits.dll"
 
 $code = @"
@@ -27,6 +27,7 @@ public static class LimitsSmoke {
     [DllImport("basis_luau_limits")] static extern IntPtr basis_luau_newstate_with_limits(ref Cfg cfg, out InitErr err);
     [DllImport("basis_luau_limits")] static extern void basis_luau_begin_execution(IntPtr L, long budgetNs);
     [DllImport("basis_luau_limits")] static extern void basis_luau_end_execution(IntPtr L);
+    [DllImport("luau", EntryPoint = "ffi_lua_close")] static extern void lua_close(IntPtr L);
     public static int Main() {
         var cfg = new Cfg { memory_cap_bytes = 8 * 1024 * 1024 };
         InitErr err;
@@ -34,6 +35,7 @@ public static class LimitsSmoke {
         if (L == IntPtr.Zero) { Console.WriteLine("newstate failed: " + err); return 1; }
         basis_luau_begin_execution(L, 50000000);
         basis_luau_end_execution(L);
+        lua_close(L);
         Console.WriteLine("ok");
         return 0;
     }

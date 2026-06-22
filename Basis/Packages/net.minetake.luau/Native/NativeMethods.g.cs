@@ -25,7 +25,7 @@ namespace Luau.Native
 #if (UNITY_IOS || UNITY_WEBGL) && !UNITY_EDITOR
         const string __DllName = "__Internal";
 #else
-        const string __DllName = "libluau";
+        const string __DllName = "luau";
 #endif
         
 

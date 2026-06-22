@@ -20,6 +20,7 @@ typedef struct basis_luau_rcu_snapshot {
     atomic_uint_least32_t reader_count;
 #endif
     int write_index;
+    int read_index;
 } basis_luau_rcu_snapshot;
 
 int basis_luau_rcu_snapshot_create(basis_luau_rcu_snapshot** out_snap, uint32_t capacity)
@@ -72,6 +73,7 @@ int basis_luau_rcu_snapshot_publish_begin(basis_luau_rcu_snapshot* snap, uint64_
     }
 #endif
     snap->write_index = (snap->write_index + 1) % 3;
+    snap->read_index = (snap->write_index + 2) % 3;
     snap->publish_epoch += 1;
     if (out_epoch) {
         *out_epoch = snap->publish_epoch;
@@ -95,11 +97,18 @@ int basis_luau_rcu_snapshot_read_begin(basis_luau_rcu_snapshot* snap, uint64_t* 
 #else
     atomic_fetch_add_explicit(&snap->reader_count, 1, memory_order_acq_rel);
 #endif
-    int read_index = (snap->write_index + 2) % 3;
     if (out_epoch) {
         *out_epoch = snap->publish_epoch;
     }
-    (void)read_index;
+    return 1;
+}
+
+int basis_luau_rcu_snapshot_read_slot(basis_luau_rcu_snapshot* snap, uint32_t slot_index, basis_luau_snapshot_slot* out_slot)
+{
+    if (!snap || !out_slot || slot_index >= snap->capacity) {
+        return 0;
+    }
+    memcpy(out_slot, &snap->buffers[snap->read_index][slot_index], sizeof(*out_slot));
     return 1;
 }
 

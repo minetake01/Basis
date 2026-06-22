@@ -30,18 +30,23 @@ function Resolve-VcVars64 {
 }
 
 function Invoke-MsvcCl {
-    param([Parameter(Mandatory = $true)][string]$Arguments)
+    param(
+        [Parameter(Mandatory = $true)][string]$Arguments,
+        [string]$WorkingDirectory
+    )
 
     $vcvars = Resolve-VcVars64
+    $cd = if ($WorkingDirectory) { "cd /d `"$WorkingDirectory`" && " } else { "" }
     if ($vcvars) {
-        cmd /c "`"$vcvars`" && cl $Arguments"
-        return $LASTEXITCODE
+        cmd /c "`"$vcvars`" && ${cd}cl $Arguments" 2>&1 | ForEach-Object { Write-Host $_ }
+        return [int]$LASTEXITCODE
     }
 
     if (Get-Command cl -ErrorAction SilentlyContinue) {
-        cmd /c "cl $Arguments"
-        return $LASTEXITCODE
+        cmd /c "${cd}cl $Arguments" 2>&1 | ForEach-Object { Write-Host $_ }
+        return [int]$LASTEXITCODE
     }
 
     Write-Error "MSVC cl.exe not found. Install Visual Studio Build Tools with the C++ workload or run from a Developer shell."
+    return 1
 }

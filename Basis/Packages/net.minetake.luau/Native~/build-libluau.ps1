@@ -165,13 +165,11 @@ function Copy-LockedFile {
     }
 }
 
-$pluginsLibLuau = Join-Path $pluginsDir "libluau.dll"
 $pluginsLuau = Join-Path $pluginsDir "luau.dll"
-Copy-LockedFile $libDll $pluginsLibLuau
 Copy-LockedFile $libDll $pluginsLuau
-$exportDll = $pluginsLibLuau
-if (Test-Path "$pluginsLibLuau.built") {
-    $exportDll = "$pluginsLibLuau.built"
+$exportDll = $pluginsLuau
+if (Test-Path "$pluginsLuau.built") {
+    $exportDll = "$pluginsLuau.built"
 }
 $pluginsImportLib = Join-Path $pluginsDir "libluau.import.lib"
 Copy-LockedFile $importLib $pluginsImportLib
@@ -214,7 +212,7 @@ public static class ExportCheck {
     }
 }
 "@
-$exportDll = if (Test-Path "$pluginsLibLuau.built") { "$pluginsLibLuau.built" } else { $pluginsLibLuau }
+$exportDll = if (Test-Path "$pluginsLuau.built") { "$pluginsLuau.built" } else { $pluginsLuau }
 [ExportCheck]::Check($exportDll)
 
-Write-Host "Done. libluau.dll, Luau.dll, basis_luau_limits.dll updated."
+Write-Host "Done. luau.dll, managed Luau.dll, and basis_luau_limits.dll updated."

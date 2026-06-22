@@ -32,9 +32,13 @@ $dllBuilt = "$dll.built"
 
 $includeFlag = "/I`"$include`""
 $linkFlag = "/link `"$importLib`""
+$objDir = Join-Path $env:TEMP "basis-luau-limits-obj"
+Remove-Item $objDir -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $objDir | Out-Null
 
-$clArgs = "/nologo /LD /O2 /DBASIS_LUAU_LIMITS_EXPORT $includeFlag `"$source`" /Fe:`"$dllBuilt`" $linkFlag"
-$exitCode = Invoke-MsvcCl -Arguments $clArgs
+$objectFile = Join-Path $objDir "basis_luau_limits.obj"
+$clArgs = "/nologo /LD /O2 /DBASIS_LUAU_LIMITS_EXPORT $includeFlag `"$source`" /Fo:`"$objectFile`" /Fe:`"$dllBuilt`" $linkFlag"
+$exitCode = Invoke-MsvcCl -WorkingDirectory $objDir -Arguments $clArgs
 if ($exitCode -ne 0) { exit $exitCode }
 
 try {
