@@ -19,7 +19,10 @@ namespace Minetake.Basis.Luau.Runtime
         public int maxPayloadBytes = 1024 * 1024;
 
         [Header("Workers")]
-        public int maxWorkers = 4;
+        public int maxWorkers = 0;
+
+        [Header("Dev")]
+        public bool allowUnsignedBytecodeInDev = true;
 
         public static BasisLuauRuntimeSettings GetOrCreate()
         {
@@ -33,10 +36,10 @@ namespace Minetake.Basis.Luau.Runtime
             return Instance;
         }
 
-        public bool AllowsUnsignedBytecodeInEditor()
+        public bool AllowsUnsignedBytecodeInDev()
         {
-#if UNITY_EDITOR
-            return true;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            return allowUnsignedBytecodeInDev;
 #else
             return false;
 #endif

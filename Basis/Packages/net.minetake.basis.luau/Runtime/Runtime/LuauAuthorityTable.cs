@@ -11,7 +11,7 @@ namespace Minetake.Basis.Luau.Runtime
     /// </summary>
     public sealed class LuauAuthorityTable
     {
-        struct Entry
+        public struct Entry
         {
             public uint Generation;
             public UnityEngine.Object Target;
@@ -34,6 +34,8 @@ namespace Minetake.Basis.Luau.Runtime
             _hostKind = hostKind;
         }
 
+        public LuauHostKind HostKind => _hostKind;
+
         public LuauObjectHandle Register(UnityEngine.Object target)
         {
             if (target == null)
@@ -49,6 +51,45 @@ namespace Minetake.Basis.Luau.Runtime
                 Tombstoned = false,
             };
             return LuauObjectHandle.Create(_hostEpoch, index);
+        }
+
+        public bool TryResolve(LuauObjectHandle handle, out UnityEngine.Object target)
+        {
+            target = null;
+            if (!handle.IsValid)
+            {
+                return false;
+            }
+
+            if (!_entries.TryGetValue(handle.Index, out Entry entry))
+            {
+                return false;
+            }
+
+            if (entry.Generation != handle.Generation || entry.Tombstoned)
+            {
+                return false;
+            }
+
+            if (entry.Target == null)
+            {
+                return false;
+            }
+
+            target = entry.Target;
+            return true;
+        }
+
+        public bool TryResolve<T>(LuauObjectHandle handle, out T target) where T : UnityEngine.Object
+        {
+            target = null;
+            if (!TryResolve(handle, out UnityEngine.Object obj))
+            {
+                return false;
+            }
+
+            target = obj as T;
+            return target != null;
         }
 
         public void Tombstone(uint index, uint generation)
@@ -95,11 +136,25 @@ namespace Minetake.Basis.Luau.Runtime
             return true;
         }
 
+        public bool ValidateHandle(LuauObjectHandle handle, Type requiredType, out UnityEngine.Object target)
+        {
+            return TryValidate(handle.Index, handle.Generation, requiredType, out target);
+        }
+
+        public IEnumerable<KeyValuePair<uint, Entry>> EnumerateEntries() => _entries;
+
         public void BumpHostEpoch()
         {
             _hostEpoch++;
             _entries.Clear();
             _nextIndex = 1;
+        }
+
+        public void Clear()
+        {
+            _entries.Clear();
+            _nextIndex = 1;
+            _hostEpoch++;
         }
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using Luau.Unity;
 using Minetake.Basis.Luau.Registry;
 
@@ -16,7 +15,13 @@ namespace Minetake.Basis.Luau.Runtime
 
         public LuauEventIngress(uint hostId) => _hostId = hostId;
 
-        public bool TryEnqueue(LuauCommandType type, uint handleIndex, uint handleGeneration, ReadOnlySpan<float> data)
+        public bool TryEnqueue(
+            LuauCommandType type,
+            uint proxyId,
+            uint proxyGeneration,
+            uint handleIndex,
+            uint handleGeneration,
+            ReadOnlySpan<float> data = default)
         {
             if (!LuauCommandCatalog.IsRegistered(type))
             {
@@ -27,6 +32,8 @@ namespace Minetake.Basis.Luau.Runtime
             {
                 Type = (ushort)type,
                 HostId = (ushort)_hostId,
+                ProxyId = proxyId,
+                ProxyGeneration = proxyGeneration,
                 HandleIndex = handleIndex,
                 HandleGeneration = handleGeneration,
             };
@@ -36,6 +43,7 @@ namespace Minetake.Basis.Luau.Runtime
                 cmd.Data[0] = data.Length > 0 ? data[0] : 0;
                 cmd.Data[1] = data.Length > 1 ? data[1] : 0;
                 cmd.Data[2] = data.Length > 2 ? data[2] : 0;
+                cmd.Data[3] = data.Length > 3 ? data[3] : 0;
             }
 
             _queue.Enqueue(cmd);
@@ -52,7 +60,7 @@ namespace Minetake.Basis.Luau.Runtime
             int count = 0;
             while (_queue.TryDequeue(out BasisLuauCommandNative cmd))
             {
-                if (native.PushCommand(_hostId, ref cmd) == BasisLuauRingResult.Ok)
+                if (native.PushEvent(_hostId, ref cmd) == BasisLuauRingResult.Ok)
                 {
                     count++;
                 }
@@ -65,7 +73,7 @@ namespace Minetake.Basis.Luau.Runtime
     public sealed class LuauTicketRegistry
     {
         uint _nextId = 1;
-        readonly Dictionary<uint, Action<LuauObjectHandle>> _pending = new();
+        readonly System.Collections.Generic.Dictionary<uint, Action<LuauObjectHandle>> _pending = new();
 
         public uint Issue(Action<LuauObjectHandle> onComplete)
         {

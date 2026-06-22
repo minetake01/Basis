@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Luau;
 using Luau.Unity;
 using Minetake.Basis.Luau.Registry;
 using Minetake.Basis.Luau.Runtime;
+using Minetake.Basis.Luau.Services;
 using UnityEngine;
 
 namespace Minetake.Basis.Luau
@@ -36,12 +36,23 @@ namespace Minetake.Basis.Luau
         bool _awakeInvoked;
         bool _onEnableInvoked;
         string _disableReason;
+        uint _proxyGeneration = 1;
 
         public bool IsEnabled => _enabled && _loaded;
         public LuauHostKind RequiredHostKind => requiredHostKind;
         public LuauHostBase BoundHost => boundHost;
         public byte[] Bytecode => bytecode;
+        public uint ProxyId { get; private set; }
+        public uint ProxyGeneration => _proxyGeneration;
+        public bool IsNativeRegistered { get; private set; }
+        public string DisableReason => _disableReason;
         internal LuauState ThreadState => _thread;
+
+        public struct ProxyGenerationState
+        {
+            public uint Generation { get; set; }
+            public bool Disabled { get; set; }
+        }
 
         public void Configure(
             LuauHostKind hostKind,
@@ -84,9 +95,30 @@ namespace Minetake.Basis.Luau
             }
         }
 
-        void Start() => _host?.InvokeLifecycle(this, "start", EmptyArgs);
+        void Start()
+        {
+            if (!_loaded && HasConfiguration())
+            {
+                if (TryLoad())
+                {
+                    InvokeAwakeIfNeeded();
+                    InvokeOnEnableIfNeeded();
+                }
+            }
 
-        void LateUpdate() => _host?.InvokeLifecycle(this, "lateUpdate", SpanWith(Time.deltaTime));
+            if (!_loaded)
+            {
+                if (!HasConfiguration())
+                {
+                    Debug.LogError($"[BasisLuau] LuauScriptProxy on '{name}' has no boundHost/bytecode configuration.");
+                    Disable(LuauDisableReason.Internal, "missing configuration");
+                }
+
+                return;
+            }
+
+            _host?.InvokeLifecycle(this, "start", EmptyArgs);
+        }
 
         void OnEnable() => InvokeOnEnableIfNeeded();
 
@@ -105,11 +137,13 @@ namespace Minetake.Basis.Luau
         {
             _host?.InvokeLifecycle(this, "onDestroy", EmptyArgs);
             _host?.UnregisterProxy(this);
+            BasisLuauOscSubscribeRegistry.ClearProxy(ProxyId);
             ReleaseThreadState();
         }
 
         internal void ReleaseThreadState()
         {
+            IsNativeRegistered = false;
             _thread?.Dispose();
             _thread = null;
             _module = null;
@@ -126,13 +160,32 @@ namespace Minetake.Basis.Luau
 
         void InvokePhysics(string method, Collider other)
         {
-            if (_host == null || other == null)
+            if (_host == null || other == null || !IsEnabled)
             {
                 return;
             }
 
-            double handle = _host.RegisterObject(other).ToRaw();
-            _host.InvokeLifecycle(this, method, SpanWith(handle));
+            LuauObjectHandle handle = _host.RegisterObject(other);
+            LuauCommandType eventType = method switch
+            {
+                "onTriggerEnter" => LuauCommandType.EventTriggerEnter,
+                "onTriggerExit" => LuauCommandType.EventTriggerExit,
+                "onCollisionEnter" => LuauCommandType.EventCollisionEnter,
+                "onCollisionExit" => LuauCommandType.EventCollisionExit,
+                _ => LuauCommandType.Invalid,
+            };
+
+            if (eventType == LuauCommandType.Invalid)
+            {
+                return;
+            }
+
+            _host.RuntimeBridge?.Events.TryEnqueue(
+                eventType,
+                ProxyId,
+                ProxyGeneration,
+                handle.Index,
+                handle.Generation);
         }
 
         public bool TryGetFunction(string name, out LuauFunction function) => _functions.TryGetValue(name, out function);
@@ -140,8 +193,11 @@ namespace Minetake.Basis.Luau
         public void Disable(LuauDisableReason reason, string message)
         {
             _enabled = false;
+            IsNativeRegistered = false;
+            _proxyGeneration++;
             _disableReason = $"{reason}: {message}";
             _functions.Clear();
+            _host?.RuntimeBridge?.BumpProxyGeneration(this);
         }
 
         void InvokeAwakeIfNeeded()
@@ -207,19 +263,26 @@ namespace Minetake.Basis.Luau
                 return false;
             }
 
-            byte[] verifiedBytecode = gate.VerifiedBytecode.ToArray();
+            ReadOnlyMemory<byte> verifiedBytecode = gate.VerifiedBytecode;
 
             _host.InitializeStateIfNeeded();
-            _host.RegisterProxy(this);
+            ProxyId = _host.RegisterProxy(this);
             handleRaws = RegisterSlotObjects(slotObjects);
 
             _thread = _host.CreateSandboxedThread();
-            LuauFunction chunk = _host.LoadBytecodeProtected(_thread, verifiedBytecode, moduleName);
+            _host.RuntimeBridge.Native.SetThreadContext(_thread, ProxyId, ProxyGeneration);
+            LuauFunction chunk = _host.LoadBytecodeProtected(_thread, verifiedBytecode.ToArray(), moduleName);
             ProtectedInvokeResult invokeResult = _host.InvokeProtectedModuleLoad(this, chunk, EmptyArgs);
             if (!invokeResult.Call.Success)
             {
+                string error = string.IsNullOrWhiteSpace(invokeResult.Call.ErrorMessage)
+                    ? "unknown module initialization failure"
+                    : invokeResult.Call.ErrorMessage;
+                Debug.LogError(
+                    $"[BasisLuau] Script '{moduleName}' failed module initialization: {invokeResult.Call.Reason}: {error}",
+                    this);
                 ReleaseThreadState();
-                Disable(invokeResult.Call.Reason, invokeResult.Call.ErrorMessage);
+                Disable(invokeResult.Call.Reason, error);
                 return false;
             }
 
@@ -235,8 +298,26 @@ namespace Minetake.Basis.Luau
             InjectHandleGlobals();
             CacheLifecycleFunctions();
             _loaded = true;
+            IsNativeRegistered = _host.RuntimeBridge.RegisterNativeProxy(
+                this,
+                _thread,
+                GetCachedFunction("update"),
+                GetCachedFunction("fixedUpdate"),
+                GetCachedFunction("lateUpdate"));
+            if (!IsNativeRegistered)
+            {
+                _loaded = false;
+                ReleaseThreadState();
+                Disable(LuauDisableReason.Internal, "native proxy registration failed");
+                return false;
+            }
+
+            _host.RuntimeBridge?.PublishInitialSnapshots();
             return true;
         }
+
+        LuauFunction GetCachedFunction(string name) =>
+            _functions.TryGetValue(name, out LuauFunction fn) ? fn : null;
 
         static LuauDisableReason MapReason(LuauFailureReason reason) => reason switch
         {
@@ -244,12 +325,6 @@ namespace Minetake.Basis.Luau
             LuauFailureReason.SignatureRejected => LuauDisableReason.Internal,
             _ => LuauDisableReason.Internal,
         };
-
-        internal void PumpUpdate(LuauHostBase host, ReadOnlySpan<LuauValue> args) =>
-            host.InvokeLifecycle(this, "update", args);
-
-        internal void PumpFixedUpdate(LuauHostBase host, ReadOnlySpan<LuauValue> args) =>
-            host.InvokeLifecycle(this, "fixedUpdate", args);
 
         internal static ReadOnlySpan<LuauValue> SpanWithDeltaTime(float value) => SpanWith(value);
 

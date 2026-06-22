@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using Luau;
 using Luau.Unity;
-using Minetake.Basis.Luau.Bindings;
-using Minetake.Basis.Luau.Policy;
 using Minetake.Basis.Luau.Registry;
 using Minetake.Basis.Luau.Runtime;
+using Minetake.Basis.Luau.Services;
 using UnityEngine;
 
 namespace Minetake.Basis.Luau
@@ -14,9 +13,10 @@ namespace Minetake.Basis.Luau
     {
         protected abstract LuauHostKind DefaultHostKind { get; }
 
-        readonly LuauObjectRegistry _registry = new();
         readonly LuauCallbackRegistry _callbacks = new();
         readonly List<LuauScriptProxy> _proxies = new();
+        readonly Dictionary<LuauScriptProxy, uint> _proxyIds = new();
+        uint _nextProxyId = 1;
 
         LuauExecutionLimits _limits;
         LuauState _rootState;
@@ -25,12 +25,11 @@ namespace Minetake.Basis.Luau
         static uint _nextHostId = 1;
 
         public LuauHostKind HostKind => DefaultHostKind;
-        public LuauObjectRegistry Registry => _registry;
         public LuauCallbackRegistry Callbacks => _callbacks;
         public LuauCapability Capability { get; private set; }
-        public LuauWhitelistPolicy Policy { get; private set; }
         public bool HasLiveState => _rootState != null && !_stateDestroyed;
         public LuauHostRuntimeBridge RuntimeBridge => _runtimeBridge;
+        public LuauAuthorityTable Authority => _runtimeBridge?.Authority;
 
         internal LuauFunction LoadBytecodeProtected(LuauState thread, byte[] verifiedBytecode, string moduleName)
         {
@@ -47,30 +46,36 @@ namespace Minetake.Basis.Luau
 
         protected virtual void Awake()
         {
-            Policy = LuauWhitelistPolicy.ForHost(HostKind);
-            Capability = new LuauCapability(HostKind, transform, Policy);
+            Capability = new LuauCapability(HostKind, transform);
             _runtimeBridge = new LuauHostRuntimeBridge(this, _nextHostId++);
             InitializeStateIfNeeded();
         }
 
         protected void OnDestroy()
         {
-            _runtimeBridge?.Dispose();
-            _runtimeBridge = null;
             DestroyState(LuauDisableReason.Internal, "host destroyed");
         }
 
-        public void RegisterProxy(LuauScriptProxy proxy)
+        public uint RegisterProxy(LuauScriptProxy proxy)
         {
             if (proxy == null)
             {
-                return;
+                throw new ArgumentNullException(nameof(proxy));
             }
 
             if (!_proxies.Contains(proxy))
             {
                 _proxies.Add(proxy);
             }
+
+            if (!_proxyIds.TryGetValue(proxy, out uint proxyId))
+            {
+                proxyId = _nextProxyId++;
+                _proxyIds[proxy] = proxyId;
+            }
+
+            _runtimeBridge?.RegisterProxy(proxyId, proxy);
+            return proxyId;
         }
 
         public void UnregisterProxy(LuauScriptProxy proxy)
@@ -78,7 +83,9 @@ namespace Minetake.Basis.Luau
             if (proxy != null)
             {
                 _proxies.Remove(proxy);
+                _proxyIds.Remove(proxy);
                 _callbacks.ClearProxy(proxy);
+                _runtimeBridge?.UnregisterProxy(proxy);
             }
         }
 
@@ -89,57 +96,19 @@ namespace Minetake.Basis.Luau
                 return;
             }
 
-            Policy ??= LuauWhitelistPolicy.ForHost(HostKind);
+            var settings = BasisLuauRuntimeSettings.GetOrCreate();
             _limits = new LuauExecutionLimits();
-            _rootState = _limits.CreateLimitedState();
-            _runtimeBridge?.EnsureNative(_limits, BasisLuauRuntimeSettings.GetOrCreate());
-            RegisterStandardLibraries(_rootState);
-            RegisterHostBindings(_rootState);
+            _runtimeBridge.EnsureNative(_limits, settings);
+            _rootState = _runtimeBridge.Native.CreateRootStateWrapper();
+            if (_rootState == null)
+            {
+                throw new InvalidOperationException(
+                    "Basis Luau failed to wrap native root VM state. Ensure libluau.dll/luau.dll are deployed and BasisLuauNativeRuntime is available.");
+            }
+
+            _rootState.OpenLibraries();
             LuauSandbox.ApplyRoot(_rootState);
         }
-
-        internal void PumpLifecycleUpdate(float dt)
-        {
-            if (_stateDestroyed)
-            {
-                return;
-            }
-
-            var arg = LuauScriptProxy.SpanWithDeltaTime(dt);
-            for (int i = 0; i < _proxies.Count; i++)
-            {
-                _proxies[i].PumpUpdate(this, arg);
-            }
-        }
-
-        internal void PumpLifecycleFixedUpdate(float fixedDt)
-        {
-            if (_stateDestroyed)
-            {
-                return;
-            }
-
-            var arg = LuauScriptProxy.SpanWithDeltaTime(fixedDt);
-            for (int i = 0; i < _proxies.Count; i++)
-            {
-                _proxies[i].PumpFixedUpdate(this, arg);
-            }
-        }
-
-        protected virtual void RegisterStandardLibraries(LuauState state)
-        {
-            state.OpenLibraries();
-        }
-
-        protected virtual void RegisterHostBindings(LuauState state)
-        {
-            state.OpenLibrary<TransformBindings>();
-            state.OpenLibrary<TimeBindings>();
-            state.OpenLibrary<UiBindings>();
-            RegisterServiceBindings(state);
-        }
-
-        protected abstract void RegisterServiceBindings(LuauState state);
 
         public LuauState CreateSandboxedThread()
         {
@@ -149,12 +118,12 @@ namespace Minetake.Basis.Luau
             return thread;
         }
 
-        public LuauObjectHandle RegisterObject(UnityEngine.Object obj) => _registry.Register(obj);
+        public LuauObjectHandle RegisterObject(UnityEngine.Object obj) => _runtimeBridge.RegisterObject(obj);
 
         public bool TryResolveTransform(LuauObjectHandle handle, out Transform transform)
         {
             transform = null;
-            if (!Capability.ValidateHandle(_registry, handle, typeof(Transform), out UnityEngine.Object obj))
+            if (!Capability.ValidateHandle(Authority, handle, typeof(Transform), out UnityEngine.Object obj))
             {
                 return false;
             }
@@ -210,8 +179,6 @@ namespace Minetake.Basis.Luau
 
         ProtectedInvokeResult InvokeProtectedCore(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args, bool handleFailure)
         {
-            LuauBindingContext.Host = this;
-            LuauBindingContext.Proxy = proxy;
             try
             {
                 LuauState state = proxy.ThreadState ?? _rootState;
@@ -223,15 +190,53 @@ namespace Minetake.Basis.Luau
 
                 return result;
             }
-            finally
+            catch (Exception ex)
             {
-                LuauBindingContext.Clear();
+                var failure = new ProtectedInvokeResult
+                {
+                    Call = new ProtectedCallResult
+                    {
+                        Success = false,
+                        Reason = LuauDisableReason.Internal,
+                        ErrorMessage = ex.Message,
+                        RecoveredViaProtectedCall = true,
+                    },
+                    ReturnValues = null,
+                };
+
+                if (handleFailure)
+                {
+                    HandleFailure(proxy, failure.Call);
+                }
+
+                return failure;
             }
         }
 
-        ProtectedCallResult InvokeProtected(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args)
+        ProtectedCallResult InvokeProtected(LuauScriptProxy proxy, LuauFunction function, ReadOnlySpan<LuauValue> args) =>
+            InvokeProtectedWithResults(proxy, function, args).Call;
+
+        internal void CompleteImageDownload(LuauScriptProxy proxy, BasisLuauImageDownloadResult result)
         {
-            return InvokeProtectedWithResults(proxy, function, args).Call;
+            if (proxy == null || !proxy.IsEnabled)
+            {
+                return;
+            }
+
+            LuauState thread = proxy.ThreadState ?? CreateSandboxedThread();
+            LuauTable table = thread.CreateTable();
+            table["success"] = result.Success;
+            table["error"] = result.Error ?? string.Empty;
+            table["sizeInMemoryBytes"] = result.SizeInMemoryBytes;
+            if (result.Result != null)
+            {
+                table["texture"] = RegisterObject(result.Result).ToRaw();
+            }
+
+            if (proxy.TryGetFunction("__imageCallback", out LuauFunction callback))
+            {
+                InvokeCallback(proxy, callback, table);
+            }
         }
 
         void HandleFailure(LuauScriptProxy proxy, ProtectedCallResult result)
@@ -244,7 +249,7 @@ namespace Minetake.Basis.Luau
             switch (result.Reason)
             {
                 case LuauDisableReason.Timeout when result.RecoveredViaProtectedCall:
-                    proxy.Disable(LuauDisableReason.Timeout, result.ErrorMessage);
+                    DisableProxyOnly(proxy, LuauDisableReason.Timeout, result.ErrorMessage);
                     break;
                 case LuauDisableReason.Timeout:
                     DestroyState(LuauDisableReason.Timeout, result.ErrorMessage);
@@ -268,6 +273,11 @@ namespace Minetake.Basis.Luau
             }
 
             _stateDestroyed = true;
+            Authority?.BumpHostEpoch();
+
+            _runtimeBridge?.Dispose();
+            _runtimeBridge = null;
+
             for (int i = 0; i < _proxies.Count; i++)
             {
                 _proxies[i].Disable(reason, message);
@@ -278,7 +288,6 @@ namespace Minetake.Basis.Luau
                 _proxies[i].ReleaseThreadState();
             }
 
-            _registry.Dispose();
             _rootState?.Dispose();
             _rootState = null;
             _limits?.Dispose();
@@ -288,6 +297,7 @@ namespace Minetake.Basis.Luau
         public void DisableProxyOnly(LuauScriptProxy proxy, LuauDisableReason reason, string message)
         {
             proxy?.Disable(reason, message);
+            _runtimeBridge?.BumpProxyGeneration(proxy);
         }
     }
 }

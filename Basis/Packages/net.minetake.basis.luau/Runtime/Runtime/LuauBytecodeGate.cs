@@ -77,7 +77,7 @@ namespace Minetake.Basis.Luau.Runtime
                     return Fail(LuauFailureReason.SignatureRejected, "signature mismatch");
                 }
             }
-            else if (!settings.AllowsUnsignedBytecodeInEditor())
+            else if (!settings.AllowsUnsignedBytecodeInDev())
             {
                 return Fail(LuauFailureReason.SignatureRejected, "unsigned bytecode rejected");
             }

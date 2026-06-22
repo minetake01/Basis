@@ -3,6 +3,8 @@
     "rootNamespace": "Minetake.Basis.Luau.Tests",
     "references": [
         "Minetake.Basis.Luau",
+        "Luau.Unity",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner"
     ],
     "includePlatforms": [],
