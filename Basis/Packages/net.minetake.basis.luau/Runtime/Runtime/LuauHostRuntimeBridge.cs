@@ -189,6 +189,71 @@ namespace Minetake.Basis.Luau.Runtime
             }
         }
 
+        internal const int DiagnosticPhaseCount = 6;
+        internal const int DiagnosticFlushCommandsBefore = 0;
+        internal const int DiagnosticProcessTickets = 1;
+        internal const int DiagnosticPublishSnapshots = 2;
+        internal const int DiagnosticDrainEvents = 3;
+        internal const int DiagnosticKickScheduler = 4;
+        internal const int DiagnosticFlushCommandsAfter = 5;
+
+        internal static string DiagnosticPhaseName(int index) => index switch
+        {
+            DiagnosticFlushCommandsBefore => "flushCommandsBefore",
+            DiagnosticProcessTickets => "processTickets",
+            DiagnosticPublishSnapshots => "publishSnapshots",
+            DiagnosticDrainEvents => "drainEvents",
+            DiagnosticKickScheduler => "kickScheduler",
+            DiagnosticFlushCommandsAfter => "flushCommandsAfter",
+            _ => throw new ArgumentOutOfRangeException(nameof(index)),
+        };
+
+        internal void PumpUpdateDiagnostic(float dt, double[] phaseMilliseconds)
+        {
+            if (phaseMilliseconds == null || phaseMilliseconds.Length < DiagnosticPhaseCount)
+            {
+                throw new ArgumentException("Phase timing buffer is too small.", nameof(phaseMilliseconds));
+            }
+
+            if (_disposed || _host == null)
+            {
+                return;
+            }
+
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
+            FlushCommands();
+            AddElapsedMilliseconds(phaseMilliseconds, DiagnosticFlushCommandsBefore, start);
+
+            start = System.Diagnostics.Stopwatch.GetTimestamp();
+            _ticketProcessor.ProcessPending();
+            AddElapsedMilliseconds(phaseMilliseconds, DiagnosticProcessTickets, start);
+
+            start = System.Diagnostics.Stopwatch.GetTimestamp();
+            PublishSnapshots(dt);
+            AddElapsedMilliseconds(phaseMilliseconds, DiagnosticPublishSnapshots, start);
+
+            start = System.Diagnostics.Stopwatch.GetTimestamp();
+            _events.DrainToNative(_native);
+            AddElapsedMilliseconds(phaseMilliseconds, DiagnosticDrainEvents, start);
+
+            start = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (_native != null && _native.IsCreated)
+            {
+                _native.KickScheduler(dt, Time.fixedDeltaTime, false);
+            }
+            AddElapsedMilliseconds(phaseMilliseconds, DiagnosticKickScheduler, start);
+
+            start = System.Diagnostics.Stopwatch.GetTimestamp();
+            FlushCommands();
+            AddElapsedMilliseconds(phaseMilliseconds, DiagnosticFlushCommandsAfter, start);
+        }
+
+        static void AddElapsedMilliseconds(double[] phaseMilliseconds, int index, long startTimestamp)
+        {
+            phaseMilliseconds[index] +=
+                (System.Diagnostics.Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        }
+
         public void PumpFixedUpdate(float fixedDt)
         {
             if (_disposed || _host == null || _native == null)

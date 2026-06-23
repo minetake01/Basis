@@ -1,0 +1,20 @@
+{
+    "name": "Minetake.Basis.Luau.Benchmarks",
+    "rootNamespace": "Minetake.Basis.Luau.Benchmarks",
+    "references": [
+        "Minetake.Basis.Luau",
+        "Luau.Unity",
+        "Luau.Native",
+        "Unity.TextMeshPro",
+        "Unity.ugui"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

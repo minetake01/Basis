@@ -1,0 +1,18 @@
+{
+    "name": "Minetake.Basis.Luau.Benchmarks.Editor",
+    "rootNamespace": "Minetake.Basis.Luau.Benchmarks.Editor",
+    "references": [
+        "Minetake.Basis.Luau.Benchmarks"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

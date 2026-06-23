@@ -15,7 +15,7 @@ function Compile-SmokeExe {
         Write-Error "csc.exe not found at $csc"
     }
 
-    & $csc /nologo /platform:x64 "/out:$OutputExe" $sourceFile
+    & $csc /nologo /platform:x64 /unsafe "/out:$OutputExe" $sourceFile
     $exitCode = $LASTEXITCODE
     Remove-Item $sourceFile -Force -ErrorAction SilentlyContinue
     if ($exitCode -ne 0) { exit $exitCode }

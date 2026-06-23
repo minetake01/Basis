@@ -28,12 +28,19 @@ namespace Minetake.Basis.Luau.Runtime
 
                 byte* bytes;
                 uint length;
-                if (native.TryGetBufferBytes(ref bufferRef, out bytes, out length) == 0 || bytes == null)
+                try
                 {
-                    return string.Empty;
-                }
+                    if (native.TryGetBufferBytes(ref bufferRef, out bytes, out length) == 0 || bytes == null)
+                    {
+                        return string.Empty;
+                    }
 
-                return Encoding.UTF8.GetString(bytes, (int)length);
+                    return Encoding.UTF8.GetString(bytes, (int)length);
+                }
+                finally
+                {
+                    native.ReleaseBuffer(ref bufferRef);
+                }
             }
         }
     }

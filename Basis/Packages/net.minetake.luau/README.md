@@ -80,4 +80,5 @@ WebGL is **not** supported (`#error` in `Runtime/PlatformGuard.cs`).
 
 ## Dependencies
 
-Unity projects also need `System.Runtime.CompilerServices.Unsafe` and `System.Text.Json` (see upstream luau-dotnet README).
+Unity projects need `System.Runtime.CompilerServices.Unsafe` and `System.Text.Json` (see upstream luau-dotnet README).
+This package vendors the Windows x64 Player managed dependency set under `Runtime/Dependencies` so IL2CPP builds can link `Luau.dll` without relying on Editor-only package dependencies.
