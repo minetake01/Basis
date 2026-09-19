@@ -85,7 +85,19 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             sampleRate = AudioSettings.outputSampleRate;
             StopEngine(); ShowError("音声デバイスの構成が変更されました。自動翻訳の設定から再接続してください。");
         }
+        public void SetEnabled(bool enabled)
+        {
+            if (Config.Enabled == enabled) return;
+            var config = Config.Copy();
+            config.Enabled = enabled;
+            Commit(config, "", "", "");
+        }
         public void Apply(TranslatorConfiguration config, string speechKey, string translationKey, string dashscopeKey)
+        {
+            config.Enabled = Config.Enabled;
+            Commit(config, speechKey, translationKey, dashscopeKey);
+        }
+        private void Commit(TranslatorConfiguration config, string speechKey, string translationKey, string dashscopeKey)
         {
             config.Validate();
             string speechPath = Path.Combine(folder, "speech.key");

@@ -26,8 +26,22 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
 
             PanelToggle enabled = PanelToggle.CreateNewEntry(aboutGroup.ContentParent);
             enabled.Descriptor.SetTitle("有効にする");
-            enabled.Descriptor.SetTooltip("保存して適用を押すまで反映されません。");
+            enabled.Descriptor.SetTooltip("すぐに開始・停止します。未保存の接続先やAPIキーは使いません。");
             enabled.SetValueWithoutNotify(host.Config.Enabled);
+            enabled.OnValueChanged += value =>
+            {
+                try { host.SetEnabled(value); }
+                catch (ArgumentException ex)
+                {
+                    enabled.SetValueWithoutNotify(host.Config.Enabled);
+                    host.ShowError(ex.Message);
+                }
+                catch (Exception)
+                {
+                    enabled.SetValueWithoutNotify(host.Config.Enabled);
+                    host.ShowError("自動翻訳を切り替えできません。接続先とAPIキーを保存してから有効にしてください。");
+                }
+            };
 
             PanelDropdown mode = PanelDropdown.CreateNewEntry(aboutGroup.ContentParent);
             mode.Descriptor.SetTitle("方式");
@@ -87,7 +101,6 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                         throw new ArgumentException("最大話者数には整数を入力してください。");
                     var config = new TranslatorConfiguration
                     {
-                        Enabled = enabled.Value,
                         Mode = mode.Value == "voice" ? TranslationMode.Voice : TranslationMode.Captions,
                         TargetLanguage = language.Value.Trim(),
                         TranslationBaseUrl = url.Value.Trim(),

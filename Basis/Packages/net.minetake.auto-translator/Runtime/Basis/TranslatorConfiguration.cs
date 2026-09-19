@@ -24,6 +24,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         public string QwenRealtimeUrl = QwenProtocol.DefaultUrl;
         public float OriginalVoiceGain = 0.2f;
         public int MaxSpeakers = 8;
+        public TranslatorConfiguration Copy() => (TranslatorConfiguration)MemberwiseClone();
         public void Validate()
         {
             if (MaxSpeakers < 1 || MaxSpeakers > 64) throw new ArgumentException("最大話者数は1〜64人で指定してください。");
