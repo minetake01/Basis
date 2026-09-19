@@ -1,0 +1,6 @@
+{
+  "rootNamespace": "Net.Minetake.AutoTranslator",
+  "references": [],
+  "name": "Net.Minetake.AutoTranslator.Contracts",
+  "noEngineReferences": true
+}

@@ -1,0 +1,25 @@
+{
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "Newtonsoft.Json.dll"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "name": "Net.Minetake.AutoTranslator.Tests",
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "overrideReferences": true,
+  "references": [
+    "Net.Minetake.AutoTranslator.Contracts",
+    "Net.Minetake.AutoTranslator.Pipeline",
+    "Net.Minetake.AutoTranslator.Grok",
+    "Net.Minetake.AutoTranslator.OpenAI",
+    "Net.Minetake.AutoTranslator.Basis"
+  ]
+}

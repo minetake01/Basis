@@ -228,6 +228,18 @@ namespace Basis.Scripts.Networking.Receivers
             return _entries.ContainsKey(playerId);
         }
 
+        /// <summary>Main-thread access to a player's non-spatialized announce voice tap.</summary>
+        public static bool TryGetAudioDriver(ushort playerId, out BasisRemoteAudioDriver driver)
+        {
+            if (_entries.TryGetValue(playerId, out var entry))
+            {
+                driver = entry.Driver;
+                return driver != null && driver.Initialized;
+            }
+            driver = null;
+            return false;
+        }
+
         /// <summary>
         /// Exposes a announcing player's receiver so the voice-recording tap can follow the
         /// announce audio path. Returns false when the player is not currently announcing.

@@ -1,0 +1,27 @@
+{
+  "name": "Net.Minetake.AutoTranslator.Basis",
+  "defineConstraints": [
+    "!UNITY_SERVER"
+  ],
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ],
+  "noEngineReferences": false,
+  "overrideReferences": true,
+  "references": [
+    "Net.Minetake.AutoTranslator.Contracts",
+    "Net.Minetake.AutoTranslator.Pipeline",
+    "Net.Minetake.AutoTranslator.Grok",
+    "Net.Minetake.AutoTranslator.OpenAI",
+    "Basis Framework",
+    "BasisSDK",
+    "BasisCommon",
+    "Unity.TextMeshPro",
+    "UnityEngine.UI"
+  ],
+  "rootNamespace": "Net.Minetake.AutoTranslator",
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ]
+}

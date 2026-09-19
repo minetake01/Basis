@@ -1,0 +1,12 @@
+{
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ],
+  "noEngineReferences": true,
+  "rootNamespace": "Net.Minetake.AutoTranslator",
+  "overrideReferences": true,
+  "name": "Net.Minetake.AutoTranslator.OpenAI",
+  "references": [
+    "Net.Minetake.AutoTranslator.Contracts"
+  ]
+}
