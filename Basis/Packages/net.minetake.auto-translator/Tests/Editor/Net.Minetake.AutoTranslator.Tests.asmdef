@@ -20,6 +20,7 @@
     "Net.Minetake.AutoTranslator.Pipeline",
     "Net.Minetake.AutoTranslator.Grok",
     "Net.Minetake.AutoTranslator.OpenAI",
+    "Net.Minetake.AutoTranslator.Qwen",
     "Net.Minetake.AutoTranslator.Basis"
   ]
 }

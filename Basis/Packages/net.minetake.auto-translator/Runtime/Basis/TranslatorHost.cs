@@ -26,6 +26,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             public readonly Action<float[], int> Callback;
             public readonly CaptionState Caption = new CaptionState();
             public TranslatorSubtitle Subtitle;
+            public TranslatedVoicePlayer Voice;
             public volatile bool Active = true;
             public int OverflowReported;
             public double LastVoice = TranslationClock.Now;
@@ -44,8 +45,9 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             public readonly int Epoch;
             public readonly CaptionUpdate? Caption;
             public readonly TranslationFault? Fault;
-            public Delivery(int epoch, CaptionUpdate? caption, TranslationFault? fault)
-            { Epoch = epoch; Caption = caption; Fault = fault; }
+            public readonly TranslatedAudioFrame? Audio;
+            public Delivery(int epoch, CaptionUpdate? caption, TranslationFault? fault, TranslatedAudioFrame? audio)
+            { Epoch = epoch; Caption = caption; Fault = fault; Audio = audio; }
         }
         public static TranslatorHost Instance { get; private set; }
         public TranslatorConfiguration Config { get; private set; } = new TranslatorConfiguration();
@@ -83,25 +85,33 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             sampleRate = AudioSettings.outputSampleRate;
             StopEngine(); ShowError("音声デバイスの構成が変更されました。自動翻訳の設定から再接続してください。");
         }
-        public void Apply(TranslatorConfiguration config, string speechKey, string translationKey)
+        public void Apply(TranslatorConfiguration config, string speechKey, string translationKey, string dashscopeKey)
         {
             config.Validate();
-            string speechPath = Path.Combine(folder, "speech.key"), translationPath = Path.Combine(folder, "translation.key");
+            string speechPath = Path.Combine(folder, "speech.key");
+            string translationPath = Path.Combine(folder, "translation.key");
+            string dashscopePath = Path.Combine(folder, "dashscope.key");
             if (!config.Enabled)
             {
-                // Disabling must remain possible even if a saved credential cannot be decrypted.
                 StopEngine();
                 if (!string.IsNullOrWhiteSpace(speechKey)) SecretStore.Save(speechPath, speechKey.Trim());
                 if (!string.IsNullOrWhiteSpace(translationKey)) SecretStore.Save(translationPath, translationKey.Trim());
+                if (!string.IsNullOrWhiteSpace(dashscopeKey)) SecretStore.Save(dashscopePath, dashscopeKey.Trim());
                 config.Save(folder); Config = config; lastError = null; Status = "無効"; return;
             }
-            // Validate provided/saved credentials before changing running state.
             string speech = string.IsNullOrWhiteSpace(speechKey) ? SecretStore.Load(speechPath) : speechKey.Trim();
             string translation = string.IsNullOrWhiteSpace(translationKey) ? SecretStore.Load(translationPath) : translationKey.Trim();
-            if (config.Enabled && (speech.Length == 0 || translation.Length == 0)) throw new ArgumentException("xAIと翻訳APIのキーを入力してください。");
+            string dashscope = string.IsNullOrWhiteSpace(dashscopeKey) ? SecretStore.Load(dashscopePath) : dashscopeKey.Trim();
+            if (config.Mode == TranslationMode.Voice)
+            {
+                if (dashscope.Length == 0) throw new ArgumentException("DashScope APIキーを入力してください。");
+            }
+            else if (speech.Length == 0 || translation.Length == 0)
+                throw new ArgumentException("xAIと翻訳APIのキーを入力してください。");
             StopEngine();
             if (!string.IsNullOrWhiteSpace(speechKey)) SecretStore.Save(speechPath, speech);
             if (!string.IsNullOrWhiteSpace(translationKey)) SecretStore.Save(translationPath, translation);
+            if (!string.IsNullOrWhiteSpace(dashscopeKey)) SecretStore.Save(dashscopePath, dashscope);
             config.Save(folder); Config = config; lastError = null;
             StartEngine();
         }
@@ -110,7 +120,9 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             StopEngine(); Config.Enabled = false;
             try
             {
-                File.Delete(Path.Combine(folder, "speech.key")); File.Delete(Path.Combine(folder, "translation.key"));
+                File.Delete(Path.Combine(folder, "speech.key"));
+                File.Delete(Path.Combine(folder, "translation.key"));
+                File.Delete(Path.Combine(folder, "dashscope.key"));
                 Config.Save(folder); lastError = null; Status = "無効・APIキーを削除しました";
             }
             catch (Exception) { ShowError("APIキーの削除または設定保存に失敗しました。"); }
@@ -119,10 +131,14 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         private void StartEngine()
         {
             if (!Config.Enabled) { Status = "無効"; return; }
-            var current = TranslatorComposition.Create(Config, SecretStore.Load(Path.Combine(folder, "speech.key")), SecretStore.Load(Path.Combine(folder, "translation.key")));
+            var current = TranslatorComposition.Create(Config,
+                Config.Mode == TranslationMode.Voice ? "" : SecretStore.Load(Path.Combine(folder, "speech.key")),
+                Config.Mode == TranslationMode.Voice ? "" : SecretStore.Load(Path.Combine(folder, "translation.key")),
+                Config.Mode == TranslationMode.Voice ? SecretStore.Load(Path.Combine(folder, "dashscope.key")) : "");
             engine = current; int generation = ++epoch;
-            current.Caption += caption => deliveries.Enqueue(new Delivery(generation, caption, null));
-            current.Fault += fault => deliveries.Enqueue(new Delivery(generation, null, fault));
+            current.Caption += caption => deliveries.Enqueue(new Delivery(generation, caption, null, null));
+            current.Audio += audio => deliveries.Enqueue(new Delivery(generation, null, null, audio));
+            current.Fault += fault => deliveries.Enqueue(new Delivery(generation, null, fault, null));
             pumpCancel = new CancellationTokenSource();
             var token = pumpCancel.Token;
             _ = Task.Run(async () =>
@@ -136,7 +152,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                             if (!capture.Active) continue;
                             if (capture.Buffer.Overflowed && Interlocked.Exchange(ref capture.OverflowReported, 1) == 0)
                             {
-                                deliveries.Enqueue(new Delivery(generation, null, new TranslationFault(capture.Id, "音声取得バッファが上限に達しました。再接続してください。")));
+                                deliveries.Enqueue(new Delivery(generation, null, new TranslationFault(capture.Id, "音声取得バッファが上限に達しました。再接続してください。"), null));
                                 capture.Active = false; continue;
                             }
                             while (capture.Active && capture.Buffer.TryPeek(out var frame))
@@ -149,7 +165,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested) { }
                 catch (Exception)
-                { deliveries.Enqueue(new Delivery(generation, null, new TranslationFault(Guid.Empty, "音声処理が停止しました。再接続してください。"))); }
+                { deliveries.Enqueue(new Delivery(generation, null, new TranslationFault(Guid.Empty, "音声処理が停止しました。再接続してください。"), null)); }
             });
             Status = "待機中（発話すると接続します）";
         }
@@ -164,7 +180,6 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         private void Update()
         {
             if (engine == null) return;
-            // Invalidate captures before delivering queued captions (mute/leave must win).
             foreach (var c in Volatile.Read(ref snapshot))
             {
                 var driver = EligibleDriver(c.Player);
@@ -183,15 +198,14 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                     if (captures.TryGetValue(fault.Speaker, out var c)) { failed.Add(c.Player); Remove(c); }
                     ShowError(fault.Message);
                 }
-                else if (delivery.Caption.HasValue && captures.TryGetValue(delivery.Caption.Value.Transcript.Speaker, out var c))
-                {
-                    c.Caption.Apply(delivery.Caption.Value, TranslationClock.Now);
-                }
+                else if (delivery.Caption.HasValue && captures.TryGetValue(delivery.Caption.Value.Transcript.Speaker, out var captioned))
+                    captioned.Caption.Apply(delivery.Caption.Value, TranslationClock.Now);
+                else if (delivery.Audio.HasValue && captures.TryGetValue(delivery.Audio.Value.Speaker, out var voiced) && voiced.Voice != null)
+                    voiced.Voice.Push(delivery.Audio.Value);
             }
             if (TranslationClock.Now >= nextScan)
             {
                 nextScan = TranslationClock.Now + 0.1;
-                // Pool reset clears AudioData even when the same receiver obtains the same object again.
                 foreach (var capture in captures.Values.ToArray())
                     if (capture.Driver.AudioData == null || !capture.Driver.AudioData.GetInvocationList().Contains(capture.Callback)) Remove(capture);
                 var admitted = new HashSet<BasisRemotePlayer>(captures.Values.Select(c => c.Player));
@@ -207,17 +221,37 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                     var capture = new Capture(candidate.Player, candidate.Driver, sampleRate);
                     try
                     {
-                        engine.AddSpeaker(capture.Id); captures.Add(capture.Id, capture);
+                        engine.AddSpeaker(capture.Id);
+                        if (Config.Mode == TranslationMode.Voice)
+                        {
+                            var mouth = candidate.Player.MouthTransform;
+                            if (mouth == null) throw new InvalidOperationException("Mouth transform is missing.");
+                            capture.Voice = TranslatedVoicePlayer.Create(mouth, candidate.Driver.BasisAudioReceiver.audioSource, candidate.Driver.IsAnnounceSource);
+                        }
+                        captures.Add(capture.Id, capture);
                         capture.Driver.AudioData += capture.Callback;
                         Volatile.Write(ref snapshot, captures.Values.ToArray());
                     }
-                    catch (Exception) { failed.Add(candidate.Player); ShowError("話者の音声処理を開始できません。再接続してください。"); }
+                    catch (Exception)
+                    {
+                        if (captures.ContainsKey(capture.Id)) Remove(capture);
+                        else
+                        {
+                            engine.RemoveSpeaker(capture.Id);
+                            if (capture.Voice != null) capture.Voice.RestoreAndDestroy(candidate.Driver.BasisAudioReceiver.audioSource);
+                        }
+                        failed.Add(candidate.Player); ShowError("話者の音声処理を開始できません。再接続してください。");
+                    }
                 }
                 failed.RemoveWhere(p => p.IsDestroyed);
                 if (lastError == null) Status = captures.Count == 0 ? "待機中（発話すると接続します）" : $"処理対象: {captures.Count}人 / 対象外: {excluded}人";
             }
             foreach (var c in captures.Values)
             {
+                if (Config.Mode == TranslationMode.Voice && c.Receiver.audioSource != null)
+                    c.Receiver.audioSource.volume = Config.OriginalVoiceGain;
+                if (c.Voice != null)
+                    c.Voice.Gain = c.Receiver.PerPlayerVolume * SMModuleAudio.ActiveMainVolume;
                 if (c.Subtitle == null && c.Caption.Original.Length > 0)
                 {
                     var plate = c.Player.NamePlateTransformProvider?.Invoke();
@@ -245,6 +279,8 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         {
             c.Active = false;
             if (c.Driver != null) c.Driver.AudioData -= c.Callback;
+            if (c.Voice != null) { c.Voice.RestoreAndDestroy(c.Receiver.audioSource); c.Voice = null; }
+            else if (c.Receiver.audioSource != null) c.Receiver.audioSource.volume = 1;
             if (c.Subtitle != null) Destroy(c.Subtitle.gameObject);
         }
         private void OnDestroy()

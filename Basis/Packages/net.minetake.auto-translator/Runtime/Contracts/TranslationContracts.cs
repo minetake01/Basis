@@ -38,6 +38,15 @@ namespace Net.Minetake.AutoTranslator
         { Transcript = transcript; Translation = translation; }
     }
 
+    public readonly struct TranslatedAudioFrame
+    {
+        public readonly Guid Speaker;
+        public readonly float[] Samples;
+        public readonly int Count, SampleRate;
+        public TranslatedAudioFrame(Guid speaker, float[] samples, int count, int sampleRate)
+        { Speaker = speaker; Samples = samples; Count = count; SampleRate = sampleRate; }
+    }
+
     public readonly struct TranslationFault
     {
         public readonly Guid Speaker;
@@ -63,6 +72,7 @@ namespace Net.Minetake.AutoTranslator
     public interface ISpeechTranslationEngine : IDisposable
     {
         event Action<CaptionUpdate> Caption;
+        event Action<TranslatedAudioFrame> Audio;
         event Action<TranslationFault> Fault;
         void AddSpeaker(Guid speaker);
         void RemoveSpeaker(Guid speaker);

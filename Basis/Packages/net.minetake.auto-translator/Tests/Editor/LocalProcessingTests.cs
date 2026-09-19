@@ -6,6 +6,7 @@ using System.Text;
 using Net.Minetake.AutoTranslator.BasisIntegration;
 using Net.Minetake.AutoTranslator.Grok;
 using Net.Minetake.AutoTranslator.OpenAI;
+using Net.Minetake.AutoTranslator.Qwen;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
@@ -161,6 +162,9 @@ namespace Net.Minetake.AutoTranslator.Tests
         {
             var config = new TranslatorConfiguration();
             Assert.That(config.Enabled, Is.False); Assert.That(config.MaxSpeakers, Is.EqualTo(8));
+            Assert.That(config.Mode, Is.EqualTo(TranslationMode.Captions));
+            Assert.That(config.VoiceLanguage, Is.EqualTo("ja"));
+            Assert.That(config.OriginalVoiceGain, Is.EqualTo(0.2f));
             Assert.That(Newtonsoft.Json.JsonConvert.SerializeObject(config), Does.Not.Contain("Key"));
         }
         [Test]
@@ -187,6 +191,76 @@ namespace Net.Minetake.AutoTranslator.Tests
             Assert.That(BitConverter.ToInt16(bytes, 0), Is.Zero);
             Assert.That(BitConverter.ToInt16(bytes, 16), Is.EqualTo(16384).Within(1));
             Assert.That(BitConverter.ToInt16(bytes, 30), Is.Zero);
+        }
+        [Test]
+        public void QwenSessionUpdateUses38OutputModalitiesAndLanguage()
+        {
+            var body = JObject.Parse(QwenProtocol.SessionUpdate("ja"));
+            Assert.That((string)body["type"], Is.EqualTo("session.update"));
+            Assert.That(body["session"]["modalities"], Is.Null);
+            Assert.That(body["session"]["output_modalities"].ToObject<string[]>(), Is.EqualTo(new[] { "text", "audio" }));
+            Assert.That((string)body["session"]["translation"]["language"], Is.EqualTo("ja"));
+            string url = QwenProtocol.Endpoint(QwenProtocol.DefaultUrl).ToString();
+            Assert.That(url, Does.Contain("model=qwen3.8-livetranslate-flash-realtime"));
+            Assert.That(url, Does.Contain("dashscope-intl.aliyuncs.com"));
+            Assert.That(url, Does.StartWith("wss://"));
+            Assert.That(QwenProtocol.VoiceLanguageNames.Length, Is.EqualTo(QwenProtocol.VoiceLanguages.Length));
+            Assert.Throws<ArgumentException>(() => QwenProtocol.Endpoint("https://dashscope.aliyuncs.com/api-ws/v1/realtime"));
+            Assert.Throws<ArgumentException>(() => QwenProtocol.SessionUpdate("yue"));
+        }
+        [Test]
+        public void QwenAudioDeltaDecodesLittleEndianPcm16()
+        {
+            var pcm = new byte[] { 0, 64, 0, 192 };
+            string json = QwenProtocol.AppendAudio(pcm);
+            var append = JObject.Parse(json);
+            Assert.That((string)append["type"], Is.EqualTo("input_audio_buffer.append"));
+            var samples = QwenProtocol.AudioDelta(new JObject { ["type"] = "response.audio.delta", ["delta"] = append["audio"] });
+            Assert.That(samples.Length, Is.EqualTo(2));
+            Assert.That(samples[0], Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(samples[1], Is.EqualTo(-0.5f).Within(0.001f));
+            Assert.Throws<FormatException>(() => QwenProtocol.Pcm16ToFloat(new byte[] { 1 }));
+        }
+        [Test]
+        public void QwenTurnAssemblerConcatenatesDeltasAndFinalizes()
+        {
+            var turn = new QwenTurnAssembler(); var id = Guid.NewGuid();
+            Assert.That(turn.Accept(id, new JObject { ["type"] = "conversation.item.input_audio_transcription.delta", ["delta"] = "Hel" }).Value.Transcript.Text, Is.EqualTo("Hel"));
+            var original = turn.Accept(id, new JObject { ["type"] = "conversation.item.input_audio_transcription.delta", ["delta"] = "lo" }).Value;
+            Assert.That(original.Transcript.Text, Is.EqualTo("Hello")); Assert.That(original.Transcript.Final, Is.False);
+            var translated = turn.Accept(id, new JObject { ["type"] = "response.audio_transcript.delta", ["delta"] = "こん" }).Value;
+            Assert.That(translated.Translation, Is.EqualTo("こん"));
+            turn.Accept(id, new JObject { ["type"] = "conversation.item.input_audio_transcription.completed", ["transcript"] = "Hello" });
+            var done = turn.Accept(id, new JObject { ["type"] = "response.audio_transcript.done", ["transcript"] = "こんにちは" }).Value;
+            Assert.That(done.Transcript.Text, Is.EqualTo("Hello"));
+            Assert.That(done.Translation, Is.EqualTo("こんにちは"));
+            Assert.That(done.Transcript.Final, Is.True);
+            var next = turn.Accept(id, new JObject { ["type"] = "conversation.item.input_audio_transcription.delta", ["delta"] = "Next" }).Value;
+            Assert.That(next.Transcript.Utterance, Is.GreaterThan(done.Transcript.Utterance));
+            Assert.That(next.Transcript.Text, Is.EqualTo("Next"));
+            Assert.That(next.Translation, Is.Null);
+        }
+        [Test]
+        public void PlaybackRingDropsOldestWhenCapacityIsExceeded()
+        {
+            var ring = new PlaybackRing(4, 3); var input = new float[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+            ring.Write(input, input.Length);
+            Assert.That(ring.Queued, Is.EqualTo(12));
+            var extra = new float[] { 13, 14, 15, 16 };
+            ring.Write(extra, extra.Length);
+            Assert.That(ring.Queued, Is.EqualTo(12));
+            var output = new float[12];
+            Assert.That(ring.Read(output, 0, 12), Is.EqualTo(12));
+            Assert.That(output, Is.EqualTo(new float[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 }));
+            Assert.That(ring.Read(output, 0, 12), Is.Zero);
+        }
+        [Test]
+        public void VoiceConfigurationRejectsTextOnlyLanguagesAndKeepsCaptionValidation()
+        {
+            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { Mode = TranslationMode.Voice, VoiceLanguage = "yue", Enabled = true }.Validate());
+            Assert.DoesNotThrow(() => new TranslatorConfiguration { Mode = TranslationMode.Voice, Enabled = true }.Validate());
+            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { Enabled = true }.Validate());
+            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { OriginalVoiceGain = 1.2f }.Validate());
         }
         [Test]
         public void FractionalRateHasContinuousOutputSamplePositions()

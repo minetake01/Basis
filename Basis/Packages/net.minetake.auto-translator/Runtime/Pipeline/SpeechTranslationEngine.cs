@@ -23,6 +23,9 @@ namespace Net.Minetake.AutoTranslator
         private readonly SemaphoreSlim requests = new SemaphoreSlim(4, 4);
         private bool disposed;
         public event Action<CaptionUpdate> Caption;
+#pragma warning disable CS0067
+        public event Action<TranslatedAudioFrame> Audio;
+#pragma warning restore CS0067
         public event Action<TranslationFault> Fault;
         public SpeechTranslationEngine(IStreamingTranscriber transcriber, ITextTranslator translator, string language)
         {

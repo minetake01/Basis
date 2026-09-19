@@ -155,4 +155,49 @@ namespace Net.Minetake.AutoTranslator
             Cursor += frames;
         }
     }
+
+    /// <summary>Single-producer playback queue. Writes past capacity drop the oldest samples.</summary>
+    public sealed class PlaybackRing
+    {
+        private readonly float[] buffer;
+        private readonly object gate = new object();
+        private int write, queued;
+        public int Capacity => buffer.Length;
+        public int Queued { get { lock (gate) return queued; } }
+        public PlaybackRing(int sampleRate, double seconds = 3)
+        {
+            if (sampleRate < 1 || seconds <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
+            buffer = new float[Math.Max(1, (int)Math.Round(sampleRate * seconds))];
+        }
+        public void Write(float[] samples, int count)
+        {
+            if (samples == null || count < 0 || count > samples.Length) throw new ArgumentException("Invalid playback samples.");
+            lock (gate)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    buffer[write] = samples[i];
+                    write = (write + 1) % buffer.Length;
+                    if (queued < buffer.Length) queued++;
+                }
+            }
+        }
+        public int Read(float[] destination, int offset, int count)
+        {
+            if (destination == null || offset < 0 || count < 0 || offset + count > destination.Length)
+                throw new ArgumentException("Invalid playback destination.");
+            lock (gate)
+            {
+                int read = (write - queued + buffer.Length) % buffer.Length;
+                int n = Math.Min(count, queued);
+                for (int i = 0; i < n; i++)
+                {
+                    destination[offset + i] = buffer[read];
+                    read = (read + 1) % buffer.Length;
+                }
+                queued -= n;
+                return n;
+            }
+        }
+    }
 }

@@ -1,0 +1,13 @@
+{
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ],
+  "noEngineReferences": true,
+  "rootNamespace": "Net.Minetake.AutoTranslator",
+  "overrideReferences": true,
+  "name": "Net.Minetake.AutoTranslator.Qwen",
+  "references": [
+    "Net.Minetake.AutoTranslator.Contracts",
+    "Net.Minetake.AutoTranslator.Pipeline"
+  ]
+}
