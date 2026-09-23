@@ -59,9 +59,9 @@ namespace Net.Minetake.AutoTranslator.Tests
         public void AudioCaptureCopiesAndLatchesOverflow()
         {
             var buffer = new AudioCaptureBuffer(3, 16); var data = new[] { 0.25f, 0.5f };
-            buffer.Write(data, 1, 48000, 1); data[0] = 1;
+            buffer.Write(data, data.Length, 1, 48000, 1); data[0] = 1;
             Assert.That(buffer.TryPeek(out var frame), Is.True); Assert.That(frame.Samples[0], Is.EqualTo(0.25f));
-            buffer.Write(data, 1, 48000, 1); buffer.Write(data, 1, 48000, 1);
+            buffer.Write(data, data.Length, 1, 48000, 1); buffer.Write(data, data.Length, 1, 48000, 1);
             Assert.That(buffer.Overflowed, Is.True);
         }
         [Test]
@@ -198,8 +198,23 @@ namespace Net.Minetake.AutoTranslator.Tests
             var body = JObject.Parse(QwenProtocol.SessionUpdate("ja"));
             Assert.That((string)body["type"], Is.EqualTo("session.update"));
             Assert.That(body["session"]["modalities"], Is.Null);
+            Assert.That(body["session"]["voice"], Is.Null);
+            Assert.That(body["session"]["turn_detection"], Is.Null);
             Assert.That(body["session"]["output_modalities"].ToObject<string[]>(), Is.EqualTo(new[] { "text", "audio" }));
+            Assert.That((string)body["session"]["audio"]["input"]["turn_detection"]["type"], Is.EqualTo("server_vad"));
+            Assert.That((string)body["session"]["audio"]["output"]["voice"], Is.EqualTo("Tina"));
             Assert.That((string)body["session"]["translation"]["language"], Is.EqualTo("ja"));
+            Assert.That((string)JObject.Parse(QwenProtocol.SessionFinish())["type"], Is.EqualTo("session.finish"));
+            Assert.That(QwenProtocol.IsConfiguredSession(JObject.Parse(
+                "{\"type\":\"session.updated\",\"session\":{\"output_modalities\":[\"text\",\"audio\"],\"audio\":{\"input\":{\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5}},\"output\":{\"voice\":\"Tina\"}},\"translation\":{\"language\":\"ja\"}}}"), "ja"));
+            Assert.That(QwenProtocol.IsConfiguredSession(JObject.Parse(
+                "{\"type\":\"session.updated\",\"session\":{\"output_modalities\":[\"text\",\"audio\"],\"audio\":{\"input\":{\"turn_detection\":{\"type\":\"speaker_detection\"}}},\"translation\":{\"language\":\"ja\"}}}"), "ja"), Is.False);
+            Assert.That(QwenProtocol.IsConfiguredSession(JObject.Parse(
+                "{\"type\":\"session.updated\",\"session\":{\"output_modalities\":[\"text\"],\"audio\":{\"input\":{\"turn_detection\":{\"type\":\"server_vad\"}}},\"translation\":{\"language\":\"ja\"}}}"), "ja"), Is.False);
+            Assert.That(QwenProtocol.IsConfiguredSession(JObject.Parse(
+                "{\"type\":\"session.updated\",\"session\":{\"output_modalities\":[\"text\",\"audio\"],\"audio\":{\"input\":{\"turn_detection\":{\"type\":\"server_vad\"}},\"output\":{\"voice\":\"Chelsie\"}},\"translation\":{\"language\":\"ja\"}}}"), "ja"), Is.False);
+            Assert.That(QwenProtocol.IsConfiguredSession(JObject.Parse(
+                "{\"type\":\"session.updated\",\"session\":{\"output_modalities\":[\"text\",\"audio\"],\"audio\":{\"input\":{\"turn_detection\":{\"type\":\"server_vad\"}}},\"translation\":{\"language\":\"en\"}}}"), "ja"), Is.False);
             string url = QwenProtocol.Endpoint(QwenProtocol.DefaultUrl).ToString();
             Assert.That(url, Does.Contain("model=qwen3.8-livetranslate-flash-realtime"));
             Assert.That(url, Does.Contain("dashscope-intl.aliyuncs.com"));
@@ -207,6 +222,20 @@ namespace Net.Minetake.AutoTranslator.Tests
             Assert.That(QwenProtocol.VoiceLanguageNames.Length, Is.EqualTo(QwenProtocol.VoiceLanguages.Length));
             Assert.Throws<ArgumentException>(() => QwenProtocol.Endpoint("https://dashscope.aliyuncs.com/api-ws/v1/realtime"));
             Assert.Throws<ArgumentException>(() => QwenProtocol.SessionUpdate("yue"));
+            Assert.That(QwenProtocol.ErrorDetail(JObject.Parse(
+                "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"invalid_api_key\",\"message\":\"Incorrect API key.\"}}")),
+                Is.EqualTo("invalid_request_error: invalid_api_key: Incorrect API key."));
+        }
+        [Test]
+        public void TimelineAdvanceDropsUnsentSamples()
+        {
+            var timeline = new PcmTimeline(1, 16000);
+            timeline.Put(0, 16000, 1); timeline.Put(0, 16002, 1);
+            timeline.AdvanceTo(16002);
+            var bytes = new byte[2]; timeline.Read(bytes, 1);
+            Assert.That(BitConverter.ToInt16(bytes, 0), Is.Zero);
+            Assert.That(timeline.Cursor, Is.EqualTo(16003));
+            Assert.Throws<ArgumentException>(() => timeline.AdvanceTo(16000));
         }
         [Test]
         public void QwenAudioDeltaDecodesLittleEndianPcm16()

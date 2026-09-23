@@ -18,17 +18,19 @@ namespace Net.Minetake.AutoTranslator
             for (int i = 0; i < slots; i++) samples[i] = new float[maxSamples];
             counts = new int[slots]; channels = new int[slots]; rates = new int[slots]; times = new double[slots];
         }
-        public void Write(float[] data, int channelCount, int sampleRate, double now)
+        public void Write(float[] data, int count, int channelCount, int sampleRate, double now)
         {
             int next = (write + 1) % samples.Length;
-            if (next == Volatile.Read(ref read) || data.Length > samples[write].Length ||
-                channelCount < 1 || sampleRate < 1 || data.Length % channelCount != 0)
+            if (next == Volatile.Read(ref read) || count < 0 || count > data.Length ||
+                count > samples[write].Length || channelCount < 1 || sampleRate < 1 || count % channelCount != 0)
             { Volatile.Write(ref overflow, 1); return; }
-            // Preserve the sample clock across callback scheduling jitter, but preserve genuine gaps.
-            double start = Math.Abs(now - expectedTime) < 0.03 ? expectedTime : now;
-            Array.Copy(data, samples[write], data.Length);
-            counts[write] = data.Length; channels[write] = channelCount; rates[write] = sampleRate; times[write] = start;
-            expectedTime = start + (double)data.Length / channelCount / sampleRate;
+            // Decoded frames are contiguous content: bursts append at the tail so queued audio is
+            // never overlapped, while a producer that falls behind the clock resyncs forward and
+            // the elapsed span stays silence.
+            double start = expectedTime > now ? expectedTime : now;
+            Array.Copy(data, samples[write], count);
+            counts[write] = count; channels[write] = channelCount; rates[write] = sampleRate; times[write] = start;
+            expectedTime = start + (double)count / channelCount / sampleRate;
             Volatile.Write(ref write, next);
         }
         public bool TryPeek(out AudioFrame frame)
@@ -135,6 +137,12 @@ namespace Net.Minetake.AutoTranslator
             for (int i = 0; i < capacity; i++)
                 if (stamps[channel][i] >= Cursor)
                     destination.Put(destinationChannel, stamps[channel][i], values[channel][i]);
+        }
+        public void AdvanceTo(long position)
+        {
+            if (position < Cursor) throw new ArgumentException("Cannot move the audio cursor backwards.");
+            Cursor = position;
+            for (int ch = 0; ch < Channels; ch++) ClearChannel(ch);
         }
         public void Read(byte[] target, int frames)
         {

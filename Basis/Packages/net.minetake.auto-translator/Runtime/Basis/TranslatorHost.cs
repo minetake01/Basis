@@ -10,6 +10,7 @@ using Basis.Scripts.BasisSdk.Players;
 using Basis.Scripts.Drivers;
 using Basis.Scripts.Networking;
 using Basis.Scripts.Networking.Receivers;
+using Net.Minetake.AutoTranslator.Qwen;
 using UnityEngine;
 
 namespace Net.Minetake.AutoTranslator.BasisIntegration
@@ -30,13 +31,16 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             public volatile bool Active = true;
             public int OverflowReported;
             public double LastVoice = TranslationClock.Now;
-            public Capture(BasisRemotePlayer player, BasisRemoteAudioDriver driver, int sampleRate)
+            public Capture(BasisRemotePlayer player, BasisRemoteAudioDriver driver)
             {
                 Player = player; Driver = driver; Receiver = driver.BasisAudioReceiver;
-                Callback = (data, channels) =>
+                // The decoded-frame tap carries the talker's own signal: distance, per-player
+                // volume, cone attenuation and tone shaping are applied later in the playback
+                // path, so translation always sees the voice at full level.
+                Callback = (pcm, length) =>
                 {
                     if (Active && ReferenceEquals(driver.BasisAudioReceiver, Receiver))
-                        Buffer.Write(data, channels, sampleRate, TranslationClock.Now);
+                        Buffer.Write(pcm, length, 1, RemoteOpusSettings.NetworkSampleRate, TranslationClock.Now);
                 };
             }
         }
@@ -58,7 +62,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         private Capture[] snapshot = Array.Empty<Capture>();
         private ISpeechTranslationEngine engine;
         private CancellationTokenSource pumpCancel;
-        private int epoch, sampleRate, excluded;
+        private int epoch, excluded;
         private double nextScan;
         private string folder, lastError;
 
@@ -75,14 +79,12 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         private void Awake()
         {
             folder = Path.Combine(Application.persistentDataPath, "net.minetake.auto-translator");
-            sampleRate = AudioSettings.outputSampleRate;
             AudioSettings.OnAudioConfigurationChanged += AudioChanged;
             try { Config = TranslatorConfiguration.Load(folder); TryStartEngine(LoadKeys()); }
             catch (Exception) { ShowError("自動翻訳の設定または保存済みキーを読み込めません。設定を確認し、必要ならキーを再入力してください。"); }
         }
         private void AudioChanged(bool deviceChanged)
         {
-            sampleRate = AudioSettings.outputSampleRate;
             StopEngine(); ShowError("音声デバイスの構成が変更されました。「保存して適用 / 再接続」で再接続してください。");
         }
         public void Apply(TranslatorConfiguration config, string speechKey, string translationKey, string dashscopeKey)
@@ -142,6 +144,8 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                 Config.Mode == TranslationMode.Voice ? "" : keys.Translation,
                 Config.Mode == TranslationMode.Voice ? keys.Dashscope : "");
             engine = current; int generation = ++epoch;
+            if (current is QwenLiveTranslateEngine qwen)
+                qwen.Diagnostic += message => Debug.Log("[AutoTranslator] " + message);
             current.Caption += caption => deliveries.Enqueue(new Delivery(generation, caption, null, null));
             current.Audio += audio => deliveries.Enqueue(new Delivery(generation, null, null, audio));
             current.Fault += fault => deliveries.Enqueue(new Delivery(generation, null, fault, null));
@@ -213,7 +217,11 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             {
                 nextScan = TranslationClock.Now + 0.1;
                 foreach (var capture in captures.Values.ToArray())
-                    if (capture.Driver.AudioData == null || !capture.Driver.AudioData.GetInvocationList().Contains(capture.Callback)) Remove(capture);
+                {
+                    var tapped = capture.Receiver.OnDecodedFrame;
+                    if (tapped == null || !tapped.GetInvocationList().Contains(capture.Callback))
+                        capture.Receiver.OnDecodedFrame = (Action<float[], int>)Delegate.Combine(tapped, capture.Callback);
+                }
                 var admitted = new HashSet<BasisRemotePlayer>(captures.Values.Select(c => c.Player));
                 var local = BasisLocalPlayer.Instance;
                 var candidates = BasisNetworkPlayers.RemotePlayers.Values.Where(p => !p.IsDestroyed && !admitted.Contains(p) && IsTranslationTarget(p))
@@ -224,7 +232,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                 foreach (var candidate in candidates)
                 {
                     if (captures.Count >= Config.MaxSpeakers || failed.Contains(candidate.Player)) { excluded++; continue; }
-                    var capture = new Capture(candidate.Player, candidate.Driver, sampleRate);
+                    var capture = new Capture(candidate.Player, candidate.Driver);
                     try
                     {
                         engine.AddSpeaker(capture.Id);
@@ -235,7 +243,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                             capture.Voice = TranslatedVoicePlayer.Create(mouth, candidate.Driver.BasisAudioReceiver.audioSource, candidate.Driver.IsAnnounceSource);
                         }
                         captures.Add(capture.Id, capture);
-                        capture.Driver.AudioData += capture.Callback;
+                        capture.Receiver.OnDecodedFrame = (Action<float[], int>)Delegate.Combine(capture.Receiver.OnDecodedFrame, capture.Callback);
                         Volatile.Write(ref snapshot, captures.Values.ToArray());
                     }
                     catch (Exception)
@@ -291,7 +299,8 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         private static void Detach(Capture c)
         {
             c.Active = false;
-            if (c.Driver != null) c.Driver.AudioData -= c.Callback;
+            if (c.Receiver != null)
+                c.Receiver.OnDecodedFrame = (Action<float[], int>)Delegate.Remove(c.Receiver.OnDecodedFrame, c.Callback);
             if (c.Voice != null) { c.Voice.RestoreAndDestroy(c.Receiver.audioSource); c.Voice = null; }
             else if (c.Receiver.audioSource != null) c.Receiver.audioSource.volume = 1;
             if (c.Subtitle != null) Destroy(c.Subtitle.gameObject);

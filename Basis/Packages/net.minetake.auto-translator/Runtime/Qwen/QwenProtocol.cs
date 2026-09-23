@@ -9,6 +9,8 @@ namespace Net.Minetake.AutoTranslator.Qwen
     {
         public const string Model = "qwen3.8-livetranslate-flash-realtime";
         public const string DefaultUrl = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime";
+        public const string TurnDetection = "server_vad";
+        public const string Voice = "Tina";
         public const int OutputSampleRate = 24000;
         public static readonly string[] VoiceLanguages =
         {
@@ -45,9 +47,41 @@ namespace Net.Minetake.AutoTranslator.Qwen
                 ["session"] = new JObject
                 {
                     ["output_modalities"] = new JArray("text", "audio"),
+                    ["audio"] = new JObject
+                    {
+                        ["input"] = new JObject
+                        {
+                            ["turn_detection"] = new JObject { ["type"] = TurnDetection }
+                        },
+                        ["output"] = new JObject { ["voice"] = Voice }
+                    },
                     ["translation"] = new JObject { ["language"] = language }
                 }
             }.ToString(Formatting.None);
+        }
+        public static string SessionFinish()
+        {
+            return new JObject { ["type"] = "session.finish" }.ToString(Formatting.None);
+        }
+        public static bool IsConfiguredSession(JObject data, string language)
+        {
+            RequireVoiceLanguage(language);
+            if (data == null || (string)data["type"] != "session.updated") return false;
+            var session = data["session"] as JObject;
+            if (session == null) return false;
+            if ((string)session["translation"]?["language"] != language) return false;
+            if (!HasModality(session["output_modalities"], "text") || !HasModality(session["output_modalities"], "audio"))
+                return false;
+            if ((string)(session["audio"]?["input"]?["turn_detection"]?["type"]) != TurnDetection) return false;
+            return (string)(session["audio"]?["output"]?["voice"]) == Voice;
+        }
+        private static bool HasModality(JToken modalities, string name)
+        {
+            var array = modalities as JArray;
+            if (array == null) return false;
+            foreach (var item in array)
+                if (item.Type == JTokenType.String && (string)item == name) return true;
+            return false;
         }
         public static string AppendAudio(byte[] pcm)
         {
@@ -63,6 +97,19 @@ namespace Net.Minetake.AutoTranslator.Qwen
             var data = JObject.Parse(json);
             if (data["type"]?.Type != JTokenType.String) throw new FormatException("Missing event type.");
             return data;
+        }
+        public static string ErrorDetail(JObject data)
+        {
+            var error = data["error"] as JObject;
+            if (error == null) return "Translation error event.";
+            string code = error["code"]?.Type == JTokenType.String ? (string)error["code"] : null;
+            string type = error["type"]?.Type == JTokenType.String ? (string)error["type"] : null;
+            string message = error["message"]?.Type == JTokenType.String ? (string)error["message"] : error.ToString(Formatting.None);
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(type)) parts.Add(type);
+            if (!string.IsNullOrEmpty(code)) parts.Add(code);
+            if (!string.IsNullOrEmpty(message)) parts.Add(message);
+            return parts.Count == 0 ? "Translation error event." : string.Join(": ", parts);
         }
         public static float[] Pcm16ToFloat(byte[] pcm)
         {
