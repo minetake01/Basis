@@ -1,0 +1,34 @@
+{
+    "name": "Net.Minetake.Basis.Cognitive3D",
+    "rootNamespace": "Net.Minetake.Basis.Cognitive3D",
+    "references": [
+        "Basis Framework",
+        "BasisSDK",
+        "BasisSettings",
+        "BasisDebug",
+        "BasisCommon",
+        "Cognitive3D"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "BASIS_FRAMEWORK_EXISTS"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.basis.framework",
+            "expression": "",
+            "define": "BASIS_FRAMEWORK_EXISTS"
+        },
+        {
+            "name": "com.cognitive3d.c3d-sdk",
+            "expression": "",
+            "define": "COGNITIVE3D_EXISTS"
+        }
+    ],
+    "noEngineReferences": false
+}

@@ -1,0 +1,11 @@
+{
+  "name": "net.minetake.cognitive3d",
+  "version": "1.0.0",
+  "displayName": "Cognitive3D Spatial Analytics for Basis",
+  "description": "Cognitive3D spatial analytics, eye tracking, and session replay integration for Basis VR.",
+  "unity": "6000.0",
+  "author": {
+    "name": "Minetake"
+  },
+  "dependencies": {}
+}
