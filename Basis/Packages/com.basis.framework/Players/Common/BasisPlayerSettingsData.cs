@@ -66,6 +66,13 @@ public struct BasisPlayerSettingsData
     public bool JiggleGrabAllowed;
 
     /// <summary>
+    /// When true, this player's incoming voice is routed to the local auto-translation
+    /// feature for caption/voice translation. Off by default — opt in per player from
+    /// the individual player panel.
+    /// </summary>
+    public bool TranslationEnabled;
+
+    /// <summary>
     /// Version number of the settings schema. Used to upgrade old files gracefully.
     /// A value of <c>0</c> after deserialization signals a missing/corrupt record.
     /// </summary>
@@ -123,6 +130,7 @@ public struct BasisPlayerSettingsData
         AlwaysShowAvatar = alwaysShowAvatar;
         NormalizeLoudness = false;
         JiggleGrabAllowed = true;
+        TranslationEnabled = false;
         Version = CurrentVersion;
     }
 

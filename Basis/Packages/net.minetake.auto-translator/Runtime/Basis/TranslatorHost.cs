@@ -51,7 +51,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
         }
         public static TranslatorHost Instance { get; private set; }
         public TranslatorConfiguration Config { get; private set; } = new TranslatorConfiguration();
-        public string Status { get; private set; } = "無効";
+        public string Status { get; private set; } = "未設定";
         private readonly Dictionary<Guid, Capture> captures = new Dictionary<Guid, Capture>();
         private readonly HashSet<BasisRemotePlayer> failed = new HashSet<BasisRemotePlayer>();
         private readonly ConcurrentQueue<Delivery> deliveries = new ConcurrentQueue<Delivery>();
@@ -77,24 +77,16 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             folder = Path.Combine(Application.persistentDataPath, "net.minetake.auto-translator");
             sampleRate = AudioSettings.outputSampleRate;
             AudioSettings.OnAudioConfigurationChanged += AudioChanged;
-            try { Config = TranslatorConfiguration.Load(folder); StartEngine(); }
+            try { Config = TranslatorConfiguration.Load(folder); TryStartEngine(LoadKeys()); }
             catch (Exception) { ShowError("自動翻訳の設定または保存済みキーを読み込めません。設定を確認し、必要ならキーを再入力してください。"); }
         }
         private void AudioChanged(bool deviceChanged)
         {
             sampleRate = AudioSettings.outputSampleRate;
-            StopEngine(); ShowError("音声デバイスの構成が変更されました。自動翻訳の設定から再接続してください。");
-        }
-        public void SetEnabled(bool enabled)
-        {
-            if (Config.Enabled == enabled) return;
-            var config = Config.Copy();
-            config.Enabled = enabled;
-            Commit(config, "", "", "");
+            StopEngine(); ShowError("音声デバイスの構成が変更されました。「保存して適用 / 再接続」で再接続してください。");
         }
         public void Apply(TranslatorConfiguration config, string speechKey, string translationKey, string dashscopeKey)
         {
-            config.Enabled = Config.Enabled;
             Commit(config, speechKey, translationKey, dashscopeKey);
         }
         private void Commit(TranslatorConfiguration config, string speechKey, string translationKey, string dashscopeKey)
@@ -103,50 +95,52 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             string speechPath = Path.Combine(folder, "speech.key");
             string translationPath = Path.Combine(folder, "translation.key");
             string dashscopePath = Path.Combine(folder, "dashscope.key");
-            if (!config.Enabled)
-            {
-                StopEngine();
-                if (!string.IsNullOrWhiteSpace(speechKey)) SecretStore.Save(speechPath, speechKey.Trim());
-                if (!string.IsNullOrWhiteSpace(translationKey)) SecretStore.Save(translationPath, translationKey.Trim());
-                if (!string.IsNullOrWhiteSpace(dashscopeKey)) SecretStore.Save(dashscopePath, dashscopeKey.Trim());
-                config.Save(folder); Config = config; lastError = null; Status = "無効"; return;
-            }
             string speech = string.IsNullOrWhiteSpace(speechKey) ? SecretStore.Load(speechPath) : speechKey.Trim();
             string translation = string.IsNullOrWhiteSpace(translationKey) ? SecretStore.Load(translationPath) : translationKey.Trim();
             string dashscope = string.IsNullOrWhiteSpace(dashscopeKey) ? SecretStore.Load(dashscopePath) : dashscopeKey.Trim();
-            if (config.Mode == TranslationMode.Voice)
-            {
-                if (dashscope.Length == 0) throw new ArgumentException("DashScope APIキーを入力してください。");
-            }
-            else if (speech.Length == 0 || translation.Length == 0)
-                throw new ArgumentException("xAIと翻訳APIのキーを入力してください。");
             StopEngine();
             if (!string.IsNullOrWhiteSpace(speechKey)) SecretStore.Save(speechPath, speech);
             if (!string.IsNullOrWhiteSpace(translationKey)) SecretStore.Save(translationPath, translation);
             if (!string.IsNullOrWhiteSpace(dashscopeKey)) SecretStore.Save(dashscopePath, dashscope);
             config.Save(folder); Config = config; lastError = null;
-            StartEngine();
+            TryStartEngine((speech, translation, dashscope));
+        }
+        private (string Speech, string Translation, string Dashscope) LoadKeys() =>
+            (SecretStore.Load(Path.Combine(folder, "speech.key")),
+             SecretStore.Load(Path.Combine(folder, "translation.key")),
+             SecretStore.Load(Path.Combine(folder, "dashscope.key")));
+        private void TryStartEngine((string Speech, string Translation, string Dashscope) keys)
+        {
+            string missing = Config.Mode == TranslationMode.Voice
+                ? (keys.Dashscope.Length == 0 ? "DashScope" : null)
+                : (keys.Speech.Length == 0 || keys.Translation.Length == 0 ? "xAI・翻訳API" : null);
+            if (missing != null) { Status = $"未設定（{missing} APIキーを保存してください）"; return; }
+            try { StartEngine(keys); }
+            catch (Exception) { ShowError("自動翻訳を開始できません。接続設定とAPIキーを確認してください。"); }
         }
         public void ClearKeys()
         {
-            StopEngine(); Config.Enabled = false;
+            StopEngine();
             try
             {
                 File.Delete(Path.Combine(folder, "speech.key"));
                 File.Delete(Path.Combine(folder, "translation.key"));
                 File.Delete(Path.Combine(folder, "dashscope.key"));
-                Config.Save(folder); lastError = null; Status = "無効・APIキーを削除しました";
+                lastError = null; Status = "未設定（APIキーを削除しました）";
             }
-            catch (Exception) { ShowError("APIキーの削除または設定保存に失敗しました。"); }
+            catch (Exception) { ShowError("APIキーの削除に失敗しました。"); }
         }
-        public void ShowError(string message) { lastError = message; Status = message; }
-        private void StartEngine()
+        public void ShowError(string message)
         {
-            if (!Config.Enabled) { Status = "無効"; return; }
+            lastError = message; Status = message;
+            Debug.LogError(message);
+        }
+        private void StartEngine((string Speech, string Translation, string Dashscope) keys)
+        {
             var current = TranslatorComposition.Create(Config,
-                Config.Mode == TranslationMode.Voice ? "" : SecretStore.Load(Path.Combine(folder, "speech.key")),
-                Config.Mode == TranslationMode.Voice ? "" : SecretStore.Load(Path.Combine(folder, "translation.key")),
-                Config.Mode == TranslationMode.Voice ? SecretStore.Load(Path.Combine(folder, "dashscope.key")) : "");
+                Config.Mode == TranslationMode.Voice ? "" : keys.Speech,
+                Config.Mode == TranslationMode.Voice ? "" : keys.Translation,
+                Config.Mode == TranslationMode.Voice ? keys.Dashscope : "");
             engine = current; int generation = ++epoch;
             current.Caption += caption => deliveries.Enqueue(new Delivery(generation, caption, null, null));
             current.Audio += audio => deliveries.Enqueue(new Delivery(generation, null, null, audio));
@@ -179,7 +173,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                 catch (Exception)
                 { deliveries.Enqueue(new Delivery(generation, null, new TranslationFault(Guid.Empty, "音声処理が停止しました。再接続してください。"), null)); }
             });
-            Status = "待機中（発話すると接続します）";
+            Status = "待機中（対象プレイヤーが発話すると接続します）";
         }
         private void StopEngine()
         {
@@ -195,7 +189,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             foreach (var c in Volatile.Read(ref snapshot))
             {
                 var driver = EligibleDriver(c.Player);
-                if (driver != c.Driver || !ReferenceEquals(driver?.BasisAudioReceiver, c.Receiver))
+                if (driver != c.Driver || !ReferenceEquals(driver?.BasisAudioReceiver, c.Receiver) || !IsTranslationTarget(c.Player))
                     Remove(c);
                 else if (c.Receiver.IsAudioActive && c.Receiver.SourcePeak > 0.0005f) c.LastVoice = TranslationClock.Now;
                 else if (TranslationClock.Now - c.LastVoice >= 30) Remove(c);
@@ -222,7 +216,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                     if (capture.Driver.AudioData == null || !capture.Driver.AudioData.GetInvocationList().Contains(capture.Callback)) Remove(capture);
                 var admitted = new HashSet<BasisRemotePlayer>(captures.Values.Select(c => c.Player));
                 var local = BasisLocalPlayer.Instance;
-                var candidates = BasisNetworkPlayers.RemotePlayers.Values.Where(p => !p.IsDestroyed && !admitted.Contains(p))
+                var candidates = BasisNetworkPlayers.RemotePlayers.Values.Where(p => !p.IsDestroyed && !admitted.Contains(p) && IsTranslationTarget(p))
                     .Select(p => (Player: p, Driver: EligibleDriver(p)))
                     .Where(x => x.Driver != null && x.Driver.BasisAudioReceiver.IsAudioActive && x.Driver.BasisAudioReceiver.SourcePeak > 0.0005f)
                     .OrderBy(x => local != null && x.Player.MouthTransform != null ? (x.Player.MouthTransform.position - local.transform.position).sqrMagnitude : 0).ToArray();
@@ -255,8 +249,8 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                         failed.Add(candidate.Player); ShowError("話者の音声処理を開始できません。再接続してください。");
                     }
                 }
-                failed.RemoveWhere(p => p.IsDestroyed);
-                if (lastError == null) Status = captures.Count == 0 ? "待機中（発話すると接続します）" : $"処理対象: {captures.Count}人 / 対象外: {excluded}人";
+                failed.RemoveWhere(p => p.IsDestroyed || !IsTranslationTarget(p));
+                if (lastError == null) Status = captures.Count == 0 ? "待機中（対象プレイヤーが発話すると接続します）" : $"処理対象: {captures.Count}人 / 対象外: {excluded}人";
             }
             foreach (var c in captures.Values)
             {
@@ -271,6 +265,13 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
                 }
                 if (c.Subtitle != null) c.Subtitle.Render(c.Caption);
             }
+        }
+        private static bool IsTranslationTarget(BasisRemotePlayer player)
+        {
+            if (string.IsNullOrEmpty(player.UUID)) return false;
+            if (BasisPlayerSettingsManager.TryGetCached(player.UUID, out var settings)) return settings.TranslationEnabled;
+            BasisPlayerSettingsManager.Warm(player.UUID);
+            return false;
         }
         private static BasisRemoteAudioDriver EligibleDriver(BasisRemotePlayer player)
         {

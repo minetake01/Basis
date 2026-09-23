@@ -15573,6 +15573,18 @@
       "value": "Even out this player's volume on your side, whatever their microphone is doing."
     },
     {
+      "key": "menu.individualPlayer.autoTranslation",
+      "value": "Auto Translation"
+    },
+    {
+      "key": "menu.individualPlayer.autoTranslation.description",
+      "value": "Send this player's voice to the translation APIs configured in Settings > Auto Translation. Captions and translated audio are only heard by you. The choice is remembered for this player."
+    },
+    {
+      "key": "menu.individualPlayer.autoTranslation.toggle",
+      "value": "Translate this player"
+    },
+    {
       "key": "menu.individualPlayer.voiceRecording",
       "value": "Voice Recording"
     },

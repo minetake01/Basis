@@ -22,26 +22,7 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             PanelElementDescriptor aboutGroup =
                 PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, container);
             aboutGroup.SetTitle("自動翻訳");
-            aboutGroup.SetDescription("字幕方式は周囲の音声をxAIへ、文字起こしを翻訳APIへ送ります。音声翻訳方式はDashScopeのQwen LiveTranslateへ送り、訳を音声でも再生します。結果は自分だけに表示・再生されます。");
-
-            PanelToggle enabled = PanelToggle.CreateNewEntry(aboutGroup.ContentParent);
-            enabled.Descriptor.SetTitle("有効にする");
-            enabled.Descriptor.SetTooltip("すぐに開始・停止します。未保存の接続先やAPIキーは使いません。");
-            enabled.SetValueWithoutNotify(host.Config.Enabled);
-            enabled.OnValueChanged += value =>
-            {
-                try { host.SetEnabled(value); }
-                catch (ArgumentException ex)
-                {
-                    enabled.SetValueWithoutNotify(host.Config.Enabled);
-                    host.ShowError(ex.Message);
-                }
-                catch (Exception)
-                {
-                    enabled.SetValueWithoutNotify(host.Config.Enabled);
-                    host.ShowError("自動翻訳を切り替えできません。接続先とAPIキーを保存してから有効にしてください。");
-                }
-            };
+            aboutGroup.SetDescription("字幕方式は周囲の音声をxAIへ、文字起こしを翻訳APIへ送ります。音声翻訳方式はDashScopeのQwen LiveTranslateへ送り、訳を音声でも再生します。結果は自分だけに表示・再生されます。翻訳する相手は個別プレイヤー画面（Audioタブ）で選び、オプトインした相手が発話した時だけ接続します。");
 
             PanelDropdown mode = PanelDropdown.CreateNewEntry(aboutGroup.ContentParent);
             mode.Descriptor.SetTitle("方式");
@@ -124,7 +105,6 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             clear.OnClicked += () =>
             {
                 host.ClearKeys();
-                enabled.SetValueWithoutNotify(false);
                 speechKey.SetPassword("");
                 translationKey.SetPassword("");
                 dashscopeKey.SetPassword("");

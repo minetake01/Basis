@@ -15,7 +15,6 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
     [Serializable]
     public sealed class TranslatorConfiguration
     {
-        public bool Enabled;
         public TranslationMode Mode;
         public string TargetLanguage = "日本語";
         public string TranslationBaseUrl = "";
@@ -33,16 +32,13 @@ namespace Net.Minetake.AutoTranslator.BasisIntegration
             {
                 if (string.IsNullOrWhiteSpace(TargetLanguage) || TargetLanguage.Length > 80)
                     throw new ArgumentException("翻訳先言語を80文字以内で指定してください。");
-                if (Enabled)
-                {
-                    ChatProtocol.Endpoint(TranslationBaseUrl);
-                    if (string.IsNullOrWhiteSpace(TranslationModel)) throw new ArgumentException("翻訳モデル名が必要です。");
-                }
+                ChatProtocol.Endpoint(TranslationBaseUrl);
+                if (string.IsNullOrWhiteSpace(TranslationModel)) throw new ArgumentException("翻訳モデル名が必要です。");
                 return;
             }
             if (Mode != TranslationMode.Voice) throw new ArgumentException("翻訳方式が不正です。");
             QwenProtocol.RequireVoiceLanguage(VoiceLanguage);
-            if (Enabled) QwenProtocol.Endpoint(QwenRealtimeUrl);
+            QwenProtocol.Endpoint(QwenRealtimeUrl);
         }
         public static TranslatorConfiguration Load(string folder)
         {

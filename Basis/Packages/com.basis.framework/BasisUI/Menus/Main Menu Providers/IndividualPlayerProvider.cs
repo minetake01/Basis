@@ -903,6 +903,29 @@ namespace Basis.BasisUI
                 sync.TalkModes?.Invoke();
             };
 
+            // ---- Auto translation (opt in per player, persisted per UUID) ----
+            if (!string.IsNullOrEmpty(remotePlayer.UUID))
+            {
+                var translateGroup = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, root);
+                translateGroup.SetTitle(BasisLocalization.Get("menu.individualPlayer.autoTranslation"));
+                translateGroup.SetDescription(BasisLocalization.Get("menu.individualPlayer.autoTranslation.description"));
+
+                PanelToggle translateToggle = PanelToggle.CreateNewEntry(translateGroup.ContentParent);
+                translateToggle.Descriptor.SetTitle(BasisLocalization.Get("menu.individualPlayer.autoTranslation.toggle"));
+                translateToggle.SetValueWithoutNotify(settings.TranslationEnabled);
+                translateToggle.OnValueChanged += async enabled =>
+                {
+                    if (remotePlayer == null)
+                    {
+                        BasisDebug.LogWarning("Individual player auto-translation change dropped: remotePlayer is null (target likely left before the toggle fired).");
+                        return;
+                    }
+                    var s = await BasisPlayerSettingsManager.RequestPlayerSettings(remotePlayer.UUID);
+                    s.TranslationEnabled = enabled;
+                    await BasisPlayerSettingsManager.SetPlayerSettings(s);
+                };
+            }
+
             AddPage(audioTabKey, audioPage);
 
             // ================= Network =================

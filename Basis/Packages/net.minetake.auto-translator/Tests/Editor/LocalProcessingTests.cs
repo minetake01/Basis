@@ -144,7 +144,7 @@ namespace Net.Minetake.AutoTranslator.Tests
         [Test]
         public void ConfigurationRejectsInvalidInputsWithoutNetwork()
         {
-            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { Enabled = true }.Validate());
+            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration().Validate());
             Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { MaxSpeakers = 0 }.Validate());
             Assert.Throws<ArgumentException>(() => ChatProtocol.Endpoint("http://remote.example/v1"));
             Assert.That(ChatProtocol.Endpoint("http://localhost:1234/v1").AbsolutePath, Is.EqualTo("/v1/chat/completions"));
@@ -158,10 +158,10 @@ namespace Net.Minetake.AutoTranslator.Tests
             Assert.That(Encoding.UTF8.GetString(SecretStore.Transform(encrypted, false)), Is.EqualTo(value));
         }
         [Test]
-        public void ConfigurationDefaultsAreDisabledAndSerializationContainsNoSecrets()
+        public void ConfigurationDefaultsAndSerializationContainNoSecrets()
         {
             var config = new TranslatorConfiguration();
-            Assert.That(config.Enabled, Is.False); Assert.That(config.MaxSpeakers, Is.EqualTo(8));
+            Assert.That(config.MaxSpeakers, Is.EqualTo(8));
             Assert.That(config.Mode, Is.EqualTo(TranslationMode.Captions));
             Assert.That(config.VoiceLanguage, Is.EqualTo("ja"));
             Assert.That(config.OriginalVoiceGain, Is.EqualTo(0.2f));
@@ -257,9 +257,9 @@ namespace Net.Minetake.AutoTranslator.Tests
         [Test]
         public void VoiceConfigurationRejectsTextOnlyLanguagesAndKeepsCaptionValidation()
         {
-            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { Mode = TranslationMode.Voice, VoiceLanguage = "yue", Enabled = true }.Validate());
-            Assert.DoesNotThrow(() => new TranslatorConfiguration { Mode = TranslationMode.Voice, Enabled = true }.Validate());
-            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { Enabled = true }.Validate());
+            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { Mode = TranslationMode.Voice, VoiceLanguage = "yue" }.Validate());
+            Assert.DoesNotThrow(() => new TranslatorConfiguration { Mode = TranslationMode.Voice }.Validate());
+            Assert.Throws<ArgumentException>(() => new TranslatorConfiguration().Validate());
             Assert.Throws<ArgumentException>(() => new TranslatorConfiguration { OriginalVoiceGain = 1.2f }.Validate());
         }
         [Test]
