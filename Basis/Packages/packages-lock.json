@@ -338,6 +338,16 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.cognitive3d.c3d-sdk": {
+      "version": "https://github.com/CognitiveVR/cvr-sdk-unity.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.xr.legacyinputhelpers": "2.1.7",
+        "com.unity.xr.management": "4.2.1"
+      },
+      "hash": "1eb9384a8eeadcc49421c498ed6f9367fb87ec33"
+    },
     "com.cqf.urpvolumetricfog": {
       "version": "file:com.cqf.urpvolumetricfog",
       "depth": 0,
@@ -835,6 +845,12 @@
       "dependencies": {
         "com.unity.modules.screencapture": "1.0.0"
       }
+    },
+    "net.minetake.cognitive3d": {
+      "version": "file:net.minetake.cognitive3d",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
     },
     "nuget.meamod.dns": {
       "version": "file:nuget.meamod.dns",
