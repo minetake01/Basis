@@ -1,6 +1,6 @@
 # Cognitive3D Spatial Analytics for Basis VR (`net.minetake.cognitive3d`)
 
-Cognitive3D 空間アナリティクス SDK を Basis VR フレームワークへ統合する公式拡張パッケージです。
+Cognitive3D 空間アナリティクス SDK を Basis VR フレームワークへ統合する拡張パッケージです。
 エンタープライズ研修、医療・産業シミュレーション、リテール検証、スタンドアロン VR アプリケーションなどの非 UGC（自社製シーン・ビルド固定）ユースケース向けに最適化されています。
 
 ---
