@@ -44,11 +44,6 @@ namespace Basis.FluxHarp
                 if (instrument == null) return;
                 if (_since < 0) _since = Time.unscaledTime;
                 float playing = Time.unscaledTime - _since;
-                if (Time.frameCount % 90 == 0)
-                {
-                    Basis.Scripts.BasisSdk.Players.BasisLocalPlayer player = Basis.Scripts.BasisSdk.Players.BasisLocalPlayer.Instance;
-                    Debug.Log($"[FluxHarpSelfCheck] t={playing:F1} player={(player != null ? player.transform.position.ToString() : "none")} eye={(Camera.main != null ? Camera.main.transform.position.ToString() : "none")} cam={(Basis.Scripts.Drivers.BasisLocalCameraDriver.CameraInstance != null ? Basis.Scripts.Drivers.BasisLocalCameraDriver.CameraInstance.transform.position.ToString() : "none")} anchor={instrument.transform.position}");
-                }
                 // The menu opens over everything on first launch; the check looks at the instrument, not at it.
                 if (!_closed && playing > PlaySeconds - 3)
                 {
