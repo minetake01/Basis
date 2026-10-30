@@ -22,7 +22,11 @@ namespace Basis.FluxHarp
         private static void SpawnWhenReady()
         {
             BasisLocalPlayer.OnLocalPlayerInitialized -= SpawnWhenReady;
-            FluxHarpInstrument.Spawn();
+            FluxHarpInstrument.Spawn().PlaceOnArrival();
+            BasisLocalPlayer.OnTeleportEvent -= PlaceWhereYouArrive;
+            BasisLocalPlayer.OnTeleportEvent += PlaceWhereYouArrive;
         }
+
+        private static void PlaceWhereYouArrive() => FluxHarpInstrument.Instance?.PlaceOnArrival();
     }
 }

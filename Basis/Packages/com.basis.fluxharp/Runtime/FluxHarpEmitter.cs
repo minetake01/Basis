@@ -138,12 +138,18 @@ namespace Basis.FluxHarp
             _sound.Render(stage.Score, Node, startTicks, rate, _mono, frames);
 
             float gain = _gain;
+            float peak = 0;
             for (int f = 0; f < frames; f++)
             {
                 float v = _mono[f] * gain;
+                peak = Math.Max(peak, Math.Abs(v));
                 int b = f * channels;
                 for (int c = 0; c < channels; c++) data[b + c] = v;
             }
+            Peak = Math.Max(Peak, peak);
         }
+
+        /// <summary>The loudest sample this line has generated since it was last read and cleared.</summary>
+        public volatile float Peak;
     }
 }

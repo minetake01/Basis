@@ -55,6 +55,7 @@ namespace Basis.FluxHarp
         private Func<long> _now;
         private FluxGlow _glow;
         private Material _glowMaterial;
+        private Transform _glowObject;
         private Transform _board;
         private Transform _lines;
         private TMP_FontAsset _font;
@@ -111,8 +112,36 @@ namespace Basis.FluxHarp
             FluxHarpInstrument instrument = go.AddComponent<FluxHarpInstrument>();
             instrument.Setup(FluxHarpNetwork.Session, () => FluxHarpNetwork.NowTicks);
             Instance = instrument;
-            if (!instrument._session.Graph.Anchor.Placed) instrument.PlaceHere();
             return instrument;
+        }
+
+        private float _placeAt = -1;
+        private Vector3 _lastFeet;
+        private int _stillFrames;
+
+        /// <summary>
+        /// Arriving somewhere (the first spawn, a respawn, a teleport) puts the instrument round you once you have
+        /// come to rest, when the piece is yours to place: alone, or as the room's sequencer. Someone else's room
+        /// keeps the anchor everyone already shares.
+        /// </summary>
+        public void PlaceOnArrival()
+        {
+            _placeAt = Time.unscaledTime;
+            _stillFrames = 0;
+        }
+
+        private void PlaceWhenSettled()
+        {
+            if (_placeAt < 0) return;
+            Transform eye = EyeTransform();
+            if (eye == null) return;
+            Vector3 feet = eye.position;
+            _stillFrames = (feet - _lastFeet).sqrMagnitude < 1e-6f ? _stillFrames + 1 : 0;
+            _lastFeet = feet;
+            // Still for half a second, or given up waiting after ten: a falling or snapping body has landed.
+            if (_stillFrames < 30 && Time.unscaledTime - _placeAt < 10) return;
+            _placeAt = -1;
+            if (_session.IsOwner) PlaceHere();
         }
 
         public static void Despawn()
@@ -137,6 +166,7 @@ namespace Basis.FluxHarp
 
             GameObject glowObject = new GameObject("Flux Light");
             glowObject.transform.SetParent(transform, false);
+            _glowObject = glowObject.transform;
             glowObject.AddComponent<MeshFilter>().sharedMesh = _glow.Mesh;
             MeshRenderer glowRenderer = glowObject.AddComponent<MeshRenderer>();
             glowRenderer.sharedMaterial = _glowMaterial;
@@ -186,11 +216,31 @@ namespace Basis.FluxHarp
 
         private void Request(FluxOp op) => _session.Request(op, _now());
 
-        /// <summary>Moves the instrument to stand around the local player, for everyone.</summary>
+        /// <summary>What the instrument is doing, in words: the piece, and each sounding line's place and level.</summary>
+        public string Report()
+        {
+            System.Text.StringBuilder s = new System.Text.StringBuilder();
+            FluxGraph graph = _session.Graph;
+            s.AppendLine($"owner={_session.IsOwner} nodes={graph.Count} voices={_program.Voices.Length} drums={_program.Drums.Length} bpm={graph.Transport.Bpm} dj={graph.Transport.Dj}");
+            Transform eye = EyeTransform();
+            s.AppendLine($"eye={(eye != null ? eye.position.ToString() : "none")} forward={(eye != null ? eye.forward.ToString() : "none")} eyeHeight={BasisHeightDriver.ScaledAvatarEyeHeight:F2} glowVerts={_glow.VertexCount} cards={_cards.Count}");
+            s.AppendLine($"anchor={transform.position} spatializer={AudioSettings.GetSpatializerPluginName()} rate={AudioSettings.outputSampleRate} gain={FluxHarpSettings.Gain:F3}");
+            foreach (KeyValuePair<ushort, FluxHarpEmitter> pair in _emitters)
+            {
+                AudioSource source = pair.Value.GetComponent<AudioSource>();
+                s.AppendLine($"line {pair.Key}: at={pair.Value.transform.position} peak={pair.Value.Peak:F4} playing={source.isPlaying} spatialize={source.spatialize} post={source.spatializePostEffects}");
+                pair.Value.Peak = 0;
+            }
+            return s.ToString();
+        }
+
+        /// <summary>Moves the instrument to stand around the local player, for everyone: centred on their feet, facing where they look.</summary>
         public void PlaceHere()
         {
             Transform eye = EyeTransform();
             if (eye == null) return;
+            // What the player sees from is the eye, in every mode (desktop, VR, a capture): the instrument stands
+            // an eye height under it, so the node sphere sits at their chest.
             Vector3 feet = eye.position - Vector3.up * Mathf.Max(0.5f, BasisHeightDriver.ScaledAvatarEyeHeight);
             Vector3 forward = Vector3.ProjectOnPlane(eye.forward, Vector3.up);
             float yaw = forward.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(forward).eulerAngles.y : 0;
@@ -605,7 +655,11 @@ namespace Basis.FluxHarp
 
         // ---- every frame ------------------------------------------------------------------------
 
-        private void Update() => Frame();
+        private void Update()
+        {
+            PlaceWhenSettled();
+            Frame();
+        }
 
         /// <summary>One frame of the instrument: clock, sound positions, cards, light.</summary>
         public void Frame()
@@ -718,6 +772,8 @@ namespace Basis.FluxHarp
             DrawBoard(graph);
             DrawDj(dj, beat, graph.Transport);
             _glow.End();
+            // The light is built in world space: its renderer stays at the world origin wherever the instrument stands.
+            _glowObject.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
         }
 
         /// <summary>
