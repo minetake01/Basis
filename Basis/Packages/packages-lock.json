@@ -82,6 +82,14 @@
         "com.unity.render-pipelines.universal": "17.4.0"
       }
     },
+    "com.basis.fluxharp": {
+      "version": "file:com.basis.fluxharp",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0"
+      }
+    },
     "com.basis.framework": {
       "version": "file:com.basis.framework",
       "depth": 0,

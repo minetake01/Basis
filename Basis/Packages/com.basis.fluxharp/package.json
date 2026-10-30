@@ -1,0 +1,19 @@
+{
+  "name": "com.basis.fluxharp",
+  "displayName": "Basis Flux Harp",
+  "version": "0.0.1",
+  "description": "A shared spatial instrument: everyone in the room edits one node expression whose lines (y = f(x), Desmos semantics) are voices. Each voice is a glowing point whose pitch and orbit come from its line, rendered through Steam Audio HRTF.",
+  "author": {
+    "name": "BasisVR",
+    "url": "https://github.com/BasisVR"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  },
+  "vpmDependencies": {
+    "com.basis.sdk": "0.0.1",
+    "com.basis.framework": "0.0.1",
+    "com.steam.steamaudio": "0.0.1"
+  }
+}

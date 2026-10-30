@@ -106,7 +106,8 @@ public partial class BasisMediaPlayerPanelProvider : BasisMenuActionProvider<Bas
         BasisMediaPlayerRegistry.OnChanged += RefreshMainMenu;
         Application.quitting -= OnQuitting;
         Application.quitting += OnQuitting;
-        SettingsProvider.AudioTabExtraBuilder = BuildAudioSettingsEntry;
+        SettingsProvider.AudioTabExtraBuilder -= BuildAudioSettingsEntry;
+        SettingsProvider.AudioTabExtraBuilder += BuildAudioSettingsEntry;
     }
 
     private static void OnQuitting()

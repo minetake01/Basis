@@ -78,7 +78,7 @@ namespace Basis.BasisUI
         /// <summary>
         /// External hook to append a section to the Audio tab. Packages (e.g.
         /// com.basis.mediaplayer) register a builder that populates the passed-in
-        /// tab content with their own controls.
+        /// tab content with their own controls. Several packages share it, so subscribe with +=.
         /// </summary>
         public static Action<RectTransform> AudioTabExtraBuilder;
 
