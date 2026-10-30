@@ -108,7 +108,7 @@ namespace Basis.FluxHarp
             FluxKindInfo[] t = new FluxKindInfo[(int)FluxKind.Drum + 1];
             void Add(FluxKindInfo info) => t[(int)info.Kind] = info;
 
-            Add(new FluxKindInfo(FluxKind.Const, "c", false));
+            Add(new FluxKindInfo(FluxKind.Const, "num", false));
             Add(new FluxKindInfo(FluxKind.X, "x", false));
             Add(new FluxKindInfo(FluxKind.Dj, "dj", false));
             Add(new FluxKindInfo(FluxKind.Add, "+", false, new FluxPort("a", 0), new FluxPort("b", 0)));

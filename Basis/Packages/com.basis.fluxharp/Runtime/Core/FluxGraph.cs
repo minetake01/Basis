@@ -180,6 +180,27 @@ namespace Basis.FluxHarp
                     return double.IsInfinity(op.Value) ? "value not finite" : null;
                 }
 
+                case FluxOpType.Extract:
+                {
+                    if (!_nodes.TryGetValue(op.Node, out FluxNode node)) return "no such node";
+                    if (op.Port >= node.Inputs.Length) return "no such port";
+                    if (node.Inputs[op.Port] != None) return "port is wired";
+                    if (!IsFinite(node.Literals[op.Port])) return "no number to lift";
+                    if (_nodes.Count >= MaxNodes) return "node limit";
+                    if (!InBoard(op.Position)) return "outside the node sphere";
+                    if (NextId == ushort.MaxValue) return "id space exhausted";
+                    op.Source = NextId;
+                    return null;
+                }
+
+                case FluxOpType.Inline:
+                {
+                    if (!_nodes.TryGetValue(op.Node, out FluxNode node)) return "no such node";
+                    if (op.Port >= node.Inputs.Length) return "no such port";
+                    if (!_nodes.TryGetValue(op.Source, out FluxNode number)) return "no such number";
+                    return number.Kind == FluxKind.Const ? null : "not a number node";
+                }
+
                 case FluxOpType.SetDj:
                     if (op.Port >= DjModes) return "no such mode";
                     // Lands on the head of the bar after the one playing now, never mid-bar, never with a fade.
@@ -247,6 +268,25 @@ namespace Basis.FluxHarp
                 {
                     FluxNode node = Get(op.Node);
                     node.Literals[op.Port] = double.IsNaN(op.Value) ? node.Info.Ports[op.Port].Default : op.Value;
+                    Revision++;
+                    break;
+                }
+
+                case FluxOpType.Extract:
+                {
+                    FluxNode node = Get(op.Node);
+                    AddNode(op.Source, FluxKind.Const, node.Literals[op.Port], op.Position);
+                    node.Inputs[op.Port] = op.Source;
+                    break;
+                }
+
+                case FluxOpType.Inline:
+                {
+                    FluxNode node = Get(op.Node);
+                    FluxNode number = Get(op.Source);
+                    node.Literals[op.Port] = number.Value;
+                    node.Inputs[op.Port] = None;
+                    if (!IsRead(op.Source)) _nodes.Remove(op.Source);
                     Revision++;
                     break;
                 }
@@ -320,6 +360,15 @@ namespace Basis.FluxHarp
                     if (input == to) return true;
                     pending.Push(input);
                 }
+            }
+            return false;
+        }
+
+        private bool IsRead(ushort id)
+        {
+            foreach (FluxNode node in _nodes.Values)
+            {
+                foreach (ushort input in node.Inputs) if (input == id) return true;
             }
             return false;
         }

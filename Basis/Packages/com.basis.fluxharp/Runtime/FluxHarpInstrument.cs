@@ -24,7 +24,11 @@ namespace Basis.FluxHarp
     public sealed class FluxHarpInstrument : MonoBehaviour, IFluxGripTarget
     {
         // Roles of a grip: what the collider it sits on stands for.
-        private const int RoleNode = 0, RolePort = 1, RoleOutPort = 2, RolePalette = 3, RoleDj = 4, RoleValue = 5;
+        private const int RoleNode = 0, RolePort = 1, RoleOutPort = 2, RolePalette = 3, RoleDj = 4, RoleValue = 5, RoleLiteral = 6;
+
+        /// <summary>Where an unwired port's own number sits in its row, from the card's left edge, and how wide it is.</summary>
+        private const float LiteralInset = 0.085f;
+        private const float LiteralWidth = 0.05f;
 
         /// <summary>Height of the node sphere's centre above the anchor: about the chest of a standing player.</summary>
         private const float BoardHeight = 1.3f;
@@ -89,6 +93,10 @@ namespace Basis.FluxHarp
             public TextMeshPro Name;
             public TextMeshPro Live;
             public TextMeshPro[] Rows;
+
+            /// <summary>Each port's own number, and the grip on it; shown and held only while the port is unwired.</summary>
+            public TextMeshPro[] Literals;
+            public Collider[] LiteralGrips;
             public string[] Shown;
         }
 
@@ -271,7 +279,15 @@ namespace Basis.FluxHarp
             root.AddComponent<BoxCollider>().size = new Vector3(FluxCard.Width, height, 0.02f);
             FluxGrip.Add(root, this, node.Kind == FluxKind.Const || node.Kind == FluxKind.Drum ? RoleValue : RoleNode, node.Id);
 
-            Card card = new Card { Kind = node.Kind, Root = root.transform, Rows = new TextMeshPro[info.Arity], Shown = new string[info.Arity + 2] };
+            Card card = new Card
+            {
+                Kind = node.Kind,
+                Root = root.transform,
+                Rows = new TextMeshPro[info.Arity],
+                Literals = new TextMeshPro[info.Arity],
+                LiteralGrips = new Collider[info.Arity],
+                Shown = new string[2 + info.Arity],
+            };
             float top = height * 0.5f;
             float headerY = top - FluxCard.Header * 0.5f;
             card.Name = Text(root.transform, info.Label, HeaderTextSize, new Vector3(-FluxCard.Width * 0.5f + FluxCard.Pad, headerY, 0), TextAlignmentOptions.Left);
@@ -283,7 +299,18 @@ namespace Basis.FluxHarp
                 port.transform.localPosition = ToVector(at);
                 port.AddComponent<SphereCollider>().radius = PortRadius;
                 FluxGrip.Add(port, this, RolePort, node.Id, p);
-                card.Rows[p] = Text(root.transform, "", TextSize, new Vector3(at.X + PortRadius + 0.004f, at.Y, 0), TextAlignmentOptions.Left);
+                card.Rows[p] = Text(root.transform, info.Ports[p].Name, TextSize, new Vector3(at.X + PortRadius + 0.004f, at.Y, 0), TextAlignmentOptions.Left);
+
+                // The port's own number: dial it sideways, pull it down to reset, pull it off the card to make it a node.
+                Vector3 literalAt = new Vector3(at.X + LiteralInset, at.Y, 0);
+                card.Literals[p] = Text(root.transform, "", TextSize, literalAt - new Vector3(LiteralWidth * 0.5f, 0, 0), TextAlignmentOptions.Left);
+                GameObject literal = new GameObject($"number {info.Ports[p].Name}");
+                literal.transform.SetParent(root.transform, false);
+                literal.transform.localPosition = literalAt;
+                BoxCollider literalBox = literal.AddComponent<BoxCollider>();
+                literalBox.size = new Vector3(LiteralWidth, FluxCard.Row * 0.9f, 0.025f);
+                FluxGrip.Add(literal, this, RoleLiteral, node.Id, p);
+                card.LiteralGrips[p] = literalBox;
             }
             if (info.IsOutput)
             {
@@ -417,7 +444,7 @@ namespace Basis.FluxHarp
             _pressValue = 0;
             if (!_session.Graph.TryGet(grip.Node, out FluxNode node)) return;
             if (grip.Role == RoleValue) _pressValue = node.Value;
-            if (grip.Role == RolePort && IsFinite(node.Literals[grip.Index])) _pressValue = node.Literals[grip.Index];
+            if (grip.Role == RoleLiteral && IsFinite(node.Literals[grip.Index])) _pressValue = node.Literals[grip.Index];
         }
 
         public void Hold(FluxGrip grip, in FluxPointer pointer)
@@ -455,6 +482,9 @@ namespace Basis.FluxHarp
             return d.y < -0.08f && -d.y > 1.5f * Mathf.Abs(d.x);
         }
 
+        /// <summary>Moved far enough from where it was taken, in no particular direction, to mean "away".</summary>
+        private bool Pulled() => Vector3.Distance(_heldPoint, _pressPoint) > 0.06f;
+
         private double Dialled()
         {
             float dx = PullSincePress().x;
@@ -491,10 +521,24 @@ namespace Basis.FluxHarp
                     Request(FluxOp.SetValue(grip.Node, dialled));
                     break;
 
+                case RoleValue when graph.TryGet(grip.Node, out FluxNode number) && number.Kind == FluxKind.Const
+                                    && TryPortAt(_heldPoint, out ushort intoNode, out int intoPort) && intoNode != grip.Node:
+                    // A number node let go on a port becomes that port's own number.
+                    Request(FluxOp.Inline(grip.Node, intoNode, intoPort));
+                    break;
+
                 case RoleNode:
                 case RoleValue:
                     // Thrown out of the sphere: gone.
                     Request(inside ? FluxOp.Move(grip.Node, local) : FluxOp.Remove(grip.Node));
+                    break;
+
+                case RoleLiteral:
+                    // A port's own number: dialled sideways, pulled down back to the port's default, or pulled
+                    // off the card into the sphere, where it becomes a number node wired into the port.
+                    if (sideways) Request(FluxOp.SetLiteral(grip.Node, grip.Index, dialled));
+                    else if (pulledDown) Request(FluxOp.SetLiteral(grip.Node, grip.Index, double.NaN));
+                    else if (Pulled() && inside) Request(FluxOp.Extract(grip.Node, grip.Index, BoardLocal(_heldPoint)));
                     break;
 
                 case RoleOutPort:
@@ -503,13 +547,10 @@ namespace Basis.FluxHarp
 
                 case RolePort:
                     if (!graph.TryGet(grip.Node, out FluxNode node)) break;
-                    bool wired = node.Inputs[grip.Index] != FluxGraph.None;
-                    // Pulled off an input onto an output: wire it. A wired input pulled away is cut; an unwired
-                    // one is dialled sideways, or pulled down back to its default.
+                    // Pulled off an input onto an output: wire it. A wired input pulled away is cut, and reads
+                    // its own number again.
                     if (TryOutAt(_heldPoint, out ushort src)) Request(FluxOp.Connect(src, grip.Node, grip.Index));
-                    else if (wired && Vector3.Distance(_heldPoint, _pressPoint) > 0.06f) Request(FluxOp.Disconnect(grip.Node, grip.Index));
-                    else if (!wired && sideways) Request(FluxOp.SetLiteral(grip.Node, grip.Index, dialled));
-                    else if (!wired && pulledDown) Request(FluxOp.SetLiteral(grip.Node, grip.Index, double.NaN));
+                    else if (node.Inputs[grip.Index] != FluxGraph.None && Pulled()) Request(FluxOp.Disconnect(grip.Node, grip.Index));
                     break;
             }
         }
@@ -619,7 +660,7 @@ namespace Basis.FluxHarp
                 bool dialling = _held != null && _held.Node == node.Id && Sideways();
                 if (node.Kind == FluxKind.Const)
                 {
-                    SetText(card, 0, card.Name, "c");
+                    SetText(card, 0, card.Name, "num");
                     SetText(card, 1, card.Live, FormatValue(dialling && _held.Role == RoleValue ? Dialled() : node.Value));
                 }
                 else if (node.Kind == FluxKind.Drum)
@@ -635,13 +676,11 @@ namespace Basis.FluxHarp
 
                 for (int p = 0; p < info.Arity; p++)
                 {
-                    string shown = info.Ports[p].Name;
-                    if (node.Inputs[p] == FluxGraph.None)
-                    {
-                        double literal = dialling && _held.Role == RolePort && _held.Index == p ? Dialled() : node.Literals[p];
-                        shown += "  " + FormatValue(literal);
-                    }
-                    SetText(card, p + 2, card.Rows[p], shown);
+                    // A wired port reads its wire; its own number waits, hidden and out of reach, until it is cut.
+                    bool own = node.Inputs[p] == FluxGraph.None;
+                    card.LiteralGrips[p].enabled = own;
+                    double literal = dialling && _held.Role == RoleLiteral && _held.Index == p ? Dialled() : node.Literals[p];
+                    SetText(card, 2 + p, card.Literals[p], own ? FormatValue(literal) : "");
                 }
             }
         }
@@ -786,8 +825,17 @@ namespace Basis.FluxHarp
                     case RoleOutPort:
                         Wire(from, _held.transform.right, _heldPoint, _held.transform.right, White);
                         break;
-                    case RolePort when !Sideways():
+                    case RolePort:
                         Wire(_heldPoint, _held.transform.right, from, _held.transform.right, new Color(1, 1, 1, 0.6f));
+                        break;
+                    case RoleLiteral when Pulled() && !Sideways() && !PulledDown():
+                        // Becoming a number node: its card outline follows the hand, wired back to the port.
+                        _glow.Ring(_heldPoint, 0.03f, 0.002f, White, 4);
+                        Wire(_heldPoint, _held.transform.right, InputWorld(_cards[_held.Node], _held.Index), _held.transform.right, new Color(1, 1, 1, 0.6f));
+                        break;
+                    case RoleValue when !Sideways() && TryPortAt(_heldPoint, out ushort intoNode, out int intoPort) && intoNode != _held.Node:
+                        // Over a port: letting go folds the number into it.
+                        _glow.Ring(InputWorld(_cards[intoNode], intoPort), PortRadius * 1.4f, 0.003f, White, 16);
                         break;
                     case RolePalette:
                         _glow.Ring(_heldPoint, 0.04f, 0.003f, White, 24);
@@ -822,8 +870,17 @@ namespace Basis.FluxHarp
             {
                 bool wired = node.Inputs[p] != FluxGraph.None;
                 Vector3 at = InputWorld(card, p);
-                if (wired) _glow.Dot(at, PortRadius * 0.6f, new Color(1, 1, 1, 0.8f), 0.4f);
-                else _glow.Ring(at, PortRadius * 0.4f, 0.0012f, new Color(1, 1, 1, 0.45f), 12);
+                if (wired)
+                {
+                    _glow.Dot(at, PortRadius * 0.6f, new Color(1, 1, 1, 0.8f), 0.4f);
+                    continue;
+                }
+                _glow.Ring(at, PortRadius * 0.4f, 0.0012f, new Color(1, 1, 1, 0.45f), 12);
+                // The port's own number gets a faint underline: it can be held like a node.
+                Vector3 l = new Vector3(FluxCard.Input(node.Kind, p).X + LiteralInset, FluxCard.Input(node.Kind, p).Y - FluxCard.Row * 0.38f, 0);
+                bool lit = _hovered != null && _hovered.Role == RoleLiteral && _hovered.Node == node.Id && _hovered.Index == p;
+                Color under = new Color(1, 1, 1, lit ? 0.8f : 0.16f);
+                _glow.Segment(t.TransformPoint(l - Vector3.right * LiteralWidth * 0.5f), t.TransformPoint(l + Vector3.right * LiteralWidth * 0.5f), 0.001f, under, under);
             }
             if (!info.IsOutput) _glow.Dot(OutputWorld(card), PortRadius * 0.7f, new Color(1, 1, 1, 0.9f), 0.4f);
         }

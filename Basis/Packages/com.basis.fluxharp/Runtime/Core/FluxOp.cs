@@ -13,6 +13,8 @@ namespace Basis.FluxHarp
         LoadPreset = 8,
         SetAnchor = 9,
         SetLiteral = 10,
+        Extract = 11,
+        Inline = 12,
     }
 
     /// <summary>
@@ -60,6 +62,20 @@ namespace Basis.FluxHarp
         /// <summary>Sets the number an unwired port reads; NaN returns it to the port's default.</summary>
         public static FluxOp SetLiteral(ushort node, int port, double value) =>
             new FluxOp { Type = FluxOpType.SetLiteral, Node = node, Port = (byte)port, Value = value };
+
+        /// <summary>
+        /// Lifts the number written in an unwired port out into a number node of its own at
+        /// <paramref name="position"/>, wired back into that port. The owner picks the new node's id.
+        /// </summary>
+        public static FluxOp Extract(ushort node, int port, FluxVec position) =>
+            new FluxOp { Type = FluxOpType.Extract, Node = node, Port = (byte)port, Position = position };
+
+        /// <summary>
+        /// Writes number node <paramref name="number"/>'s value into a port as its literal, unwiring the port.
+        /// A number node left feeding nothing goes with it.
+        /// </summary>
+        public static FluxOp Inline(ushort number, ushort node, int port) =>
+            new FluxOp { Type = FluxOpType.Inline, Source = number, Node = node, Port = (byte)port };
 
         public static FluxOp SetDj(int mode) => new FluxOp { Type = FluxOpType.SetDj, Port = (byte)mode };
 

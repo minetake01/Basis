@@ -76,6 +76,18 @@ namespace Basis.FluxHarp.Editor
             Shot(dir, "inside_ring", cam, instrument, ref now, session, beat: 13.4,
                 eye: new Vector3(0, 1.6f, 0), look: new Vector3(1.5f, 1.9f, -1.2f));
 
+            // The two homes of a number, side by side: the seed's amplitude is a number node; the voice's turn is
+            // lifted out into a node of its own; its radius stays written in its port.
+            session.Request(FluxOp.LoadPreset(FluxPreset.Seed), now);
+            ushort voice = 0;
+            foreach (FluxNode n in session.Graph.Nodes) if (n.Kind == FluxKind.Voice) voice = n.Id;
+            session.Request(FluxOp.SetLiteral(voice, 1, 0.125), now);
+            session.Request(FluxOp.SetLiteral(voice, 2, 1.8), now);
+            session.Request(FluxOp.Extract(voice, 1, new FluxVec(0.05f, -0.2f, 0.7f)), now);
+            if (session.Graph.Get(voice).Inputs[1] == FluxGraph.None) throw new InvalidOperationException("Extract was not applied.");
+            Shot(dir, "numbers", cam, instrument, ref now, session, beat: 1.0,
+                eye: new Vector3(0, 1.4f, 0), look: new Vector3(0, 1.3f, 1f), fov: 50);
+
             UnityEngine.Object.DestroyImmediate(go);
             Debug.Log("[FluxRenderCapture] done");
         }

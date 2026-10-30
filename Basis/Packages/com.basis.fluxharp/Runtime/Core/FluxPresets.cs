@@ -16,8 +16,9 @@ namespace Basis.FluxHarp
 
     /// <summary>
     /// Pieces that ship with the instrument. Each is written the way a player builds one: an expression over
-    /// x, the DJ mode and numbers, with no hidden machinery behind it. Pitches are raw ratios; nothing is
-    /// rounded to a scale.
+    /// x, the DJ mode and numbers, with no hidden machinery behind it. A number is written into the port that
+    /// reads it, or, where it is meant to be played with, is a number node of its own. Pitches are raw
+    /// ratios; nothing is rounded to a scale.
     /// </summary>
     public static class FluxPresets
     {
@@ -49,7 +50,7 @@ namespace Basis.FluxHarp
             {
                 case FluxPreset.Yxeni: BuildYxeni(b); break;
                 case FluxPreset.Fourths: BuildFourths(b); break;
-                case FluxPreset.Seed: b.Voice(b.Mul(0.25, b.Sin(b.X))); break;
+                case FluxPreset.Seed: b.Voice(b.Mul(b.Knob(0.25), b.Sin(b.X))); break;
                 default: throw new ArgumentOutOfRangeException(nameof(preset));
             }
             FluxBuilder.Layout(graph);
@@ -93,8 +94,9 @@ namespace Basis.FluxHarp
             FluxTerm eighth = b.Frac(b.Mul(2, b.X));
             b.Voice(b.If(b.Lt(eighth, 0.72), b.Add(b.Add(root, -2), b.Mul(0.22, b.Exp(b.Mul(-14, eighth))))), 0, 1.6);
 
-            // Pad: Ah · Chy · guest, turning half a turn per loop, a third of a turn apart.
-            FluxTerm spin = b.Div(b.X, 32);
+            // Pad: Ah · Chy · guest, turning half a turn per loop, a third of a turn apart. How fast it turns is a
+            // number node of its own, there to be dialled.
+            FluxTerm spin = b.Div(b.X, b.Knob(32));
             FluxTerm padRoot = b.Add(root, -1);
             b.Voice(padRoot, spin, 3.2);
             b.Voice(b.Add(padRoot, Oct(3.0 / 2.0)), b.Add(spin, 1.0 / 3.0), 3.2);

@@ -259,7 +259,7 @@ namespace Basis.FluxHarp
                 Beat = r.ReadDouble(),
                 Ticks = r.ReadInt64(),
             };
-            return op.Type >= FluxOpType.AddNode && op.Type <= FluxOpType.SetLiteral
+            return op.Type >= FluxOpType.AddNode && op.Type <= FluxOpType.Inline
                 && FluxKindInfo.IsKnown((byte)op.Kind)
                 && op.Position.IsFinite && !double.IsNaN(op.Beat) && !double.IsInfinity(op.Beat);
         }

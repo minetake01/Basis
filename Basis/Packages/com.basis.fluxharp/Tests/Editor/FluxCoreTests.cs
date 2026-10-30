@@ -210,6 +210,62 @@ namespace Basis.FluxHarp.Tests
             Assert.That(Eval(copy, scaled, 0.5), Is.EqualTo(0.5));
         }
 
+        [Test]
+        public void ANumberMovesBetweenItsPortAndANodeOfItsOwnWithoutChangingTheSound()
+        {
+            FluxGraph owner = new FluxGraph();
+            FluxBuilder b = new FluxBuilder(owner);
+            ushort scaled = b.Mul(12, b.Frac(b.X)).Node;
+            FluxGraph peer = owner.Clone();
+            void Commit(ref FluxOp op)
+            {
+                Assert.That(owner.Validate(ref op, 0), Is.Null);
+                owner.Apply(op);
+                FluxCodec.TryReadCommit(FluxCodec.Commit(1, op), out _, out FluxOp received);
+                peer.Apply(received);
+            }
+
+            // Lifted out: a number node, wired back in, everyone sees the same new node.
+            FluxOp lift = FluxOp.Extract(scaled, 0, new FluxVec(0, 0, 0.7f));
+            Commit(ref lift);
+            ushort number = owner.Get(scaled).Inputs[0];
+            Assert.That(owner.Get(number).Kind, Is.EqualTo(FluxKind.Const));
+            Assert.That(peer.Get(scaled).Inputs[0], Is.EqualTo(number));
+            Assert.That(Eval(peer, scaled, 0.5), Is.EqualTo(6));
+
+            // The node is the number now: dialling it changes the sound.
+            FluxOp dial = FluxOp.SetValue(number, 24);
+            Commit(ref dial);
+            Assert.That(Eval(peer, scaled, 0.5), Is.EqualTo(12));
+
+            // A wired port cannot be lifted again.
+            FluxOp twice = FluxOp.Extract(scaled, 0, new FluxVec(0, 0, 0.7f));
+            Assert.That(owner.Validate(ref twice, 0), Is.Not.Null);
+
+            // Folded back in: the port holds the node's number, and the node, feeding nothing else, is gone.
+            FluxOp fold = FluxOp.Inline(number, scaled, 0);
+            Commit(ref fold);
+            Assert.That(owner.Get(scaled).Inputs[0], Is.EqualTo(FluxGraph.None));
+            Assert.That(peer.TryGet(number, out _), Is.False);
+            Assert.That(Eval(peer, scaled, 0.5), Is.EqualTo(12));
+        }
+
+        [Test]
+        public void ANumberNodeFeedingSeveralPortsSurvivesBeingFoldedIntoOne()
+        {
+            FluxGraph g = new FluxGraph();
+            FluxBuilder b = new FluxBuilder(g);
+            FluxTerm k = b.Knob(3);
+            ushort a = b.Add(k, 1).Node;
+            ushort m = b.Mul(k, 2).Node;
+            FluxOp fold = FluxOp.Inline(k.Node, a, 0);
+            Assert.That(g.Validate(ref fold, 0), Is.Null);
+            g.Apply(fold);
+            Assert.That(g.TryGet(k.Node, out _), Is.True);
+            Assert.That(Eval(g, a, 0), Is.EqualTo(4));
+            Assert.That(Eval(g, m, 0), Is.EqualTo(6));
+        }
+
         // ---- the clock -------------------------------------------------------------------------
 
         [Test]
