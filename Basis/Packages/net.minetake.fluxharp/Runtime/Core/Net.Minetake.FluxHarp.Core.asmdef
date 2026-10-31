@@ -1,0 +1,14 @@
+{
+    "name": "Net.Minetake.FluxHarp.Core",
+    "rootNamespace": "Net.Minetake.FluxHarp",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

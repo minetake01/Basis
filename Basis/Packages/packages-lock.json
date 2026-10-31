@@ -82,8 +82,8 @@
         "com.unity.render-pipelines.universal": "17.4.0"
       }
     },
-    "com.basis.fluxharp": {
-      "version": "file:com.basis.fluxharp",
+    "net.minetake.fluxharp": {
+      "version": "file:net.minetake.fluxharp",
       "depth": 0,
       "source": "embedded",
       "dependencies": {
