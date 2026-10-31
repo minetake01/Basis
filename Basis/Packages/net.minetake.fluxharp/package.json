@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "description": "A shared spatial instrument: everyone in the room edits one node expression whose lines (y = f(x), Desmos semantics) are voices. Each voice is a glowing point whose pitch and orbit come from its line, rendered through Steam Audio HRTF.",
   "author": {
-    "name": "minetake",
-    "url": "https://github.com/minetake"
+    "name": "minetake01",
+    "url": "https://github.com/minetake01"
   },
   "license": "MIT",
   "dependencies": {
